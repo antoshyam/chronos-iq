@@ -1,0 +1,234 @@
+[
+  {
+    "file_name": "RCA_f1791457-bbad-f114-8041-1ea035bf3243.txt",
+    "match_result": {
+      "matched_log_id": "cluster_4",
+      "match_score": 0.78,
+      "confidence": "MEDIUM",
+      "explanation": "Best match is cluster_4 because the new RCA shares the same core graph pattern: CloudBees CRMBuilds Build.Rel.602829 procedure, failed Make/compile step, Make exit code 4, CloudBees failedReason=Compile, abortJob cascade with downstream SaveBuild impact, missing Make/step logs limiting exact compiler-error confirmation, and a disk-saturation contributor connected to preventive cleanup/preflight actions. The new RCA has stronger host-specific disk evidence: las-colo12-h19-20 had 0 bytes free and 100% disk in-use, whereas cluster_4 only had pool-wide /local/mnt saturation with missing telemetry on the failing host. This lowers confidence from HIGH to MEDIUM and makes it a close pattern match rather than an identical incident match. Node/relationship occurrence counts would be incremented for: Make step, Build.Rel.602829, exit-code-4 symptom, failedReason=Compile symptom, abortJob cascade, SaveBuild downstream-of-Make, disk-exhaustion contributor, missing Make log data gap, disk cleanup remediation, retrieve step logs remediation, preflight disk/resource validation preventive, automated workspace cleanup preventive, and disk alerting preventive.",
+      "remediations": [
+        {
+          "id": "remediation_retrieve_cloudbees_step_logs",
+          "name": "Retrieve CloudBees Make step execution logs",
+          "description": "Retrieve and inspect the Make step output to confirm the exact compiler or infrastructure error, specifically searching for compiler diagnostics, undefined references, missing files, 'No space left on device', or license-denial messages."
+        },
+        {
+          "id": "remediation_check_and_free_disk",
+          "name": "Check and free disk space on the failing build host",
+          "description": "Verify disk usage on the affected agent/physical host and clean stale build artifacts, object files, and intermediate outputs before rerunning. For the new RCA, prioritize las-colo12-h19-20 under the CRM build workspace/DONTCOPY paths."
+        },
+        {
+          "id": "remediation_rerun_after_disk_cleanup",
+          "name": "Rerun build after disk cleanup",
+          "description": "Rerun the failed build only after sufficient disk space is available. If the build fails again with the same Make exit code 4 and no disk errors, treat the remaining failure as a probable code/toolchain compile issue."
+        }
+      ],
+      "preventive_actions": [
+        {
+          "id": "preventive_pre_dispatch_agent_health_checks",
+          "name": "Implement pre-dispatch or pre-Make disk/resource health checks",
+          "description": "Before dispatching or running Make, validate that the selected agent has sufficient free disk space, memory, CPU headroom, and required toolchain availability; reject or fail fast on hosts below threshold."
+        },
+        {
+          "id": "preventive_automated_build_workspace_cleanup",
+          "name": "Implement automated build workspace cleanup",
+          "description": "Enforce retention and cleanup of stale build outputs, intermediate objects, and DONTCOPY/workspace artifacts to prevent recurring build-host disk saturation."
+        },
+        {
+          "id": "preventive_disk_alerting",
+          "name": "Add or extend disk utilization alerting",
+          "description": "Create or extend Datadog disk monitors for build hosts and relevant mount points, alerting before free space reaches critical levels such as below 10 GB, below 10%, or above 90% utilization."
+        },
+        {
+          "id": "preventive_forward_make_logs",
+          "name": "Forward Make execution logs to observability tooling",
+          "description": "Ensure CloudBees Make step compiler output and execution logs are forwarded to Splunk/Datadog so future RCAs can distinguish code compile errors from disk, IO, and license failures."
+        }
+      ]
+    }
+  },
+  {
+    "file_name": "RCA_f1792701-e535-f1fe-9808-2686f9881e6f.txt",
+    "match_result": {
+      "matched_log_id": "unmatched_3:RCA_f1792a35-ae04-f103-a22f-4efb9ff91010.txt",
+      "match_score": 0.82,
+      "confidence": "HIGH",
+      "explanation": "Best match is unmatched_3 because it shares the dominant graph pattern: CRMBuilds procedure Build.Rel.602829; Setup succeeds; Make is the compile/build step; BuildInfoJson/failedReason=Compile; VerifySrc and SaveBuild are downstream error/abort outcomes; SourceViolationRequired NoSuchProperty is present; infrastructure/Commander health is not the primary cause; and missing Make execution logs limit exact compiler-error confirmation. Relationship overlap is strong for procedure has_step Make/VerifySrc/SaveBuild, Make classified as compile, failedReason Compile supporting compile root cause, abort cascade/cascaded_to SaveBuild, and remediations addressing Make log retrieval plus SourceViolationRequired handling. Differences: the new RCA treats SourceViolationRequired as secondary/non-root and Make as the clear trigger after ~12 seconds on crm-ubuntu221, while unmatched_3 had Make and VerifySrc failures in parallel on crm-ubuntulv02 and considered the missing property a secondary contributing cause. Node/relationship occurrence counts for the matched pattern should be incremented for Build.Rel.602829, Setup, Make, VerifySrc, SaveBuild, Compile, Source verification, Build save, failedReason=Compile, Make error/abort, abort cascade, VerifySrc aborted, SaveBuild cascaded failure, NoSuchProperty SourceViolationRequired, healthy agent/Commander, missing Make log gap, and the associated remediation/preventive-action edges.",
+      "remediations": [
+        {
+          "id": "rem_001",
+          "name": "Examine Make step log",
+          "description": "Retrieve and inspect the Make step execution log to identify the exact compiler error, source file, line number, failing component, and exit details. This is verified by both the new RCA and matched log as the primary evidence gap for confirming the compile failure."
+        },
+        {
+          "id": "rem_002",
+          "name": "Investigate SourceViolationRequired property population",
+          "description": "Determine which upstream step or procedure definition should set /myJob/SourceViolationRequired, and review Setup/Init/SyncSetup or equivalent pipeline logic to explain why VerifySrc saw the property as missing."
+        },
+        {
+          "id": "rem_003",
+          "name": "Update VerifySrc missing-property handling",
+          "description": "Ensure SourceViolationRequired is set before VerifySrc runs, or make VerifySrc handle an absent property with a safe/default behavior and a descriptive error rather than causing a generic NoSuchProperty abort."
+        },
+        {
+          "id": "rem_004",
+          "name": "Fix compile error and rerun build",
+          "description": "After the Make log identifies the concrete compiler/source/dependency/build-configuration failure, apply the code or configuration fix and rerun the build."
+        }
+      ],
+      "preventive_actions": [
+        {
+          "id": "pa_001",
+          "name": "Add pre-flight property check for VerifySrc",
+          "description": "Before VerifySrc executes, validate required job properties including SourceViolationRequired and fail early with a clear message if they are absent."
+        },
+        {
+          "id": "pa_002",
+          "name": "Improve Make failure reporting",
+          "description": "Capture and surface compiler error details from Make into centralized logs or job properties so future RCAs do not depend on manually retrieving agent-local step logs."
+        },
+        {
+          "id": "pa_003",
+          "name": "Monitor SourceViolationRequired NoSuchProperty pattern",
+          "description": "Create CloudBees/Splunk/Datadog monitoring for VerifySrc failures involving NoSuchProperty on /myJob/SourceViolationRequired to detect recurrences quickly."
+        },
+        {
+          "id": "pa_005",
+          "name": "Validate associated build/source compatibility",
+          "description": "Add pre-build validation for source sync completeness, required files, toolchain availability, dependency matrix compatibility, and build environment readiness before running Make."
+        }
+      ]
+    }
+  },
+  {
+    "file_name": "RCA_f1792911-5e79-f10a-a110-2686f9881e6f.txt",
+    "match_result": {
+      "matched_log_id": "cluster_2",
+      "match_score": 0.72,
+      "confidence": "MEDIUM",
+      "explanation": "Best match is cluster_2 because the core graph pattern aligns: CloudBees CRMBuilds procedure Build.Rel.602829 contains a failed Make compile step; BuildInfoJson/CloudBees records failedReason=Compile; Make failure with abortJob causes job abort/cascade; SaveBuild is downstream/aborted rather than an independent root cause; the exact compiler error is unavailable because the Make step log must be retrieved; and the primary verified remediation is to inspect the Make log and rerun after the confirmed fix. The match is not HIGH because the new RCA has a distinct infrastructure contributor: critical ~99% memory pressure on san-w175-ma3-1-05 with concurrent jobs and stepLimit=9, while cluster_2 reports no detected infrastructure/resource contention and uses a different agent/exit-code context.",
+      "remediations": [
+        {
+          "id": "remediation_retrieve_make_log",
+          "name": "Retrieve/examine the Make step log",
+          "description": "Inspect the Make step execution log to identify the exact compiler error, exit code, failing source/component, or OOM/process-kill evidence. This is verified across the matched RCA pattern and is the primary remediation for the new RCA."
+        },
+        {
+          "id": "remediation_fix_code_if_compile_error",
+          "name": "Fix confirmed compiler/code error",
+          "description": "If the Make log shows syntax errors, missing symbols, missing files, linker errors, or component-specific compiler failures, review the relevant revision/label changes and engage the owning component/build team before rerunning."
+        },
+        {
+          "id": "remediation_reduce_concurrency_if_oom",
+          "name": "Reduce concurrency if OOM is confirmed",
+          "description": "If the Make log or OS logs show Killed, oom-kill, memory allocation failure, or unexplained compiler termination consistent with memory exhaustion, lower the agent/resource-pool stepLimit and avoid running concurrent memory-intensive builds on the host."
+        },
+        {
+          "id": "remediation_increase_or_dedicate_memory_if_oom",
+          "name": "Use more memory or dedicated agents if OOM is confirmed",
+          "description": "For confirmed memory-induced compile failure, move large firmware builds to dedicated/high-memory agents or increase RAM capacity on the affected build host."
+        },
+        {
+          "id": "remediation_rerun_after_fix",
+          "name": "Rerun build after addressing confirmed cause",
+          "description": "Retry the build only after the Make log confirms whether the root cause is a code/compiler issue or memory/OOM issue and the corresponding corrective action has been applied."
+        }
+      ],
+      "preventive_actions": [
+        {
+          "id": "preventive_forward_build_logs",
+          "name": "Forward Make/build logs to centralized logging",
+          "description": "Ensure Make step logs and compiler output are collected in Splunk/Datadog or another centralized store so future RCAs do not depend on direct agent log retrieval."
+        },
+        {
+          "id": "preventive_memory_aware_scheduling",
+          "name": "Implement memory-aware scheduling",
+          "description": "Prevent assignment of large memory-intensive compile jobs to agents already under high memory utilization."
+        },
+        {
+          "id": "preventive_step_limit_tuning",
+          "name": "Tune agent stepLimit/concurrency",
+          "description": "Review and lower stepLimit for CRMBuildsLinux agents that run large firmware builds to avoid concurrent memory exhaustion."
+        },
+        {
+          "id": "preventive_datadog_memory_monitoring",
+          "name": "Add memory utilization monitors",
+          "description": "Alert when build-agent memory utilization exceeds warning/critical thresholds, e.g. 85\u201390%, before compile steps are dispatched."
+        },
+        {
+          "id": "preventive_pre_make_memory_check",
+          "name": "Add pre-Make memory validation",
+          "description": "Add a pre-Make guard step that verifies sufficient free memory before launching compilation and delays/fails early with a clear diagnostic if memory is insufficient."
+        }
+      ]
+    }
+  },
+  {
+    "file_name": "RCA_f1793408-9ec8-f1c3-a226-4efb9ff91010.txt",
+    "match_result": {
+      "matched_log_id": "unmatched_15 / log_rca_f179d493",
+      "match_score": 0.46,
+      "confidence": "LOW",
+      "explanation": "Best available match is unmatched_15 because it shares the graph pattern of outcome=error with AbortStatus=ABORT, an upstream failing/aborted step, downstream steps aborted or not executed, healthy Commander/agent indicators, missing detailed step logs limiting confidence, and remediation relationships that focus on inspecting step logs and rerunning after correction. Key nodes do not match: the new RCA is DistributeBuildToRemote.Rel.521730 with GetCompilePackage pending/no completion and DownloadInRemoteSite not executed, while unmatched_15 is Build.Rel.602829 with Make exit code 4 / compile failure. Occurrence counts are incremented for the recurring node/relationship patterns: job completed_error/ABORT, upstream step abort causing downstream non-execution, infrastructure not implicated, missing step logs limits confidence, remediation addresses data gap, and rerun addresses transient failure.",
+      "remediations": [
+        {
+          "id": "remediation_examine_step_logs",
+          "name": "Examine CloudBees and agent-side step logs",
+          "description": "Open the CloudBees Commander job log viewer for job f1793408-9ec8-f1c3-a226-4efb9ff91010, inspect GetCompilePackage step ID f1793408-a865-f134-8ba9-1ea035bf3243, and check agent-side logs on hyd-d1952-d2-3-01 under /prj/qct/ecworkspace/."
+        },
+        {
+          "id": "remediation_verify_artifact_repository",
+          "name": "Verify artifact repository availability and package access",
+          "description": "Check the artifact repository used by GetCompilePackage for availability and access logs during the failure window, and confirm the compile package for MPSS.HI.4.3.4.c3-00141-MANNAR_GENMD_TEST-1 exists and is accessible."
+        },
+        {
+          "id": "remediation_verify_pcm",
+          "name": "Verify PCM Web Service availability",
+          "description": "Check whether https://pcm.qualcomm.com/PcmService/PCMWebService.V20200123.svc?wsdl was reachable from hyd-d1952-d2-3-01 during approximately 05:13:15 to 05:17:37 PDT on 2026-07-06 and review PCM service logs for errors."
+        },
+        {
+          "id": "remediation_check_workspace_mount",
+          "name": "Check workspace mount health",
+          "description": "Verify that \\\\crmhyd\\ecworkspace\\ and /prj/qct/ecworkspace/ were accessible from hyd-d1952-d2-3-01 during the job window. Monitor /local/mnt growth, although it was not critical in the available metrics."
+        },
+        {
+          "id": "remediation_rerun_job",
+          "name": "Re-run the job after dependency checks",
+          "description": "If PCM or artifact repository issues were transient, re-run job f1793408-9ec8-f1c3-a226-4efb9ff91010 or the equivalent build distribution job and monitor GetCompilePackage closely."
+        }
+      ],
+      "preventive_actions": [
+        {
+          "id": "preventive_enable_step_log_forwarding",
+          "name": "Enable step-level log forwarding to Splunk",
+          "description": "Configure CloudBees agent log forwarding so agent-side execution logs for steps such as GetCompilePackage and DownloadInRemoteSite are available in Splunk for future RCA."
+        },
+        {
+          "id": "preventive_artifact_repo_monitoring",
+          "name": "Add artifact repository availability monitors",
+          "description": "Monitor the artifact repository used by GetCompilePackage for availability and response time."
+        },
+        {
+          "id": "preventive_datadog_pcm_synthetic",
+          "name": "Add Datadog synthetic monitoring for PCM Web Service",
+          "description": "Create a Datadog HTTP check for https://pcm.qualcomm.com/PcmService/PCMWebService.V20200123.svc?wsdl to detect PCM availability issues proactively."
+        },
+        {
+          "id": "preventive_cloudbees_retry_policy",
+          "name": "Implement CloudBees job retry policy",
+          "description": "Configure automatic retry for GetCompilePackage on transient failures such as network timeout or artifact server unavailability, using or aligning with the existing artifact retry mechanism."
+        },
+        {
+          "id": "preventive_review_timeout",
+          "name": "Review GetCompilePackage timeout configuration",
+          "description": "Ensure the GetCompilePackage timeout is appropriate for expected artifact download size and network conditions."
+        },
+        {
+          "id": "preventive_monitor_local_mnt",
+          "name": "Monitor /local/mnt disk growth trend",
+          "description": "Set a Datadog alert around 80% utilization for /local/mnt on hyd-d1952-d2-3-01 to prevent future workspace-full failures."
+        }
+      ]
+    }
+  }
+]
