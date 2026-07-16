@@ -1,0 +1,430 @@
+---
+job_id: f1791457-bbad-f114-8041-1ea035bf3243
+chat_id: 1R1M4QRXHQXBED8JT0GB
+generated_at: 2026-07-07T21:10:11.760653
+source: NOVA
+partial_response: False
+---
+
+I now have all the evidence needed. The disk was **0 bytes free** from at least 07:00 UTC (well before the job started at 08:26 UTC), and the disk used spiked from ~124 GB to ~133 GB during the Make step window. The `BuildInfoJson` explicitly records `failedReason=Compile`. The agent reported `status OK` with `exit code 4`. Let me now compile the complete RCA report.
+
+---
+
+# CloudBees CD/RO Root Cause Analysis Report
+
+---
+
+## # 1 Summary
+
+**Job `SA_WLAN.HSP.1.1.5-00995-QCAHSPSWPL_V1_V2_SILICONZ-1.1_20260706_012605_012610`** (Job ID: `f1791457-bbad-f114-8041-1ea035bf3243`) failed on **2026-07-06** at **08:31:27 UTC** during the **Make** step with **exit code 4** on agent host **`crm-ubuntulv57`** (physical host: **`las-colo12-h19-20`**).
+
+The CloudBees `BuildInfoJson` metadata explicitly records **`failedReason=Compile`**. The Make step executed two firmware build scripts (`build.sh 6490.wlanfw.eval_v1_TO` and `build.sh 6490.wlanfw.eval_v2_TO`) targeting the WLAN HSP silicon platform. The build process returned **exit code 4**, which is a standard `make` non-zero exit indicating a **compile-time error** within the build scripts.
+
+A secondary, correlated infrastructure observation was identified: the agent host `las-colo12-h19-20` had **0 bytes of free disk space** throughout the entire observation window (from at least 07:00 UTC, 86+ minutes before the job started). Disk used spiked from ~124 GB to ~133 GB during the Make step execution window. While disk exhaustion is a confirmed infrastructure condition on the agent host, the CloudBees system itself classified the failure as **Compile**, and the agent reported `status OK` (not a disk I/O error). The relationship between disk exhaustion and the compile exit code cannot be definitively proven without direct step execution logs. Both findings are reported with their respective confidence levels.
+
+The `SaveBuild` step failure was a **downstream consequence** of the Make step abort and is not an independent root cause.
+
+---
+
+## # 2 Job Context
+
+| Field | Value |
+|---|---|
+| **Job ID** | `f1791457-bbad-f114-8041-1ea035bf3243` |
+| **Job Name** | `SA_WLAN.HSP.1.1.5-00995-QCAHSPSWPL_V1_V2_SILICONZ-1.1_20260706_012605_012610` |
+| **Build ID** | `SA_WLAN.HSP.1.1.5-00995-QCAHSPSWPL_V1_V2_SILICONZ-1.1` |
+| **Project** | `CRMBuilds` |
+| **Procedure** | `Build.Rel.602829` |
+| **Launched By** | `tiberiumUserEC10_11` |
+| **Build Requester** | `clagan` |
+| **Run As** | `aswbldsv` |
+| **Execution Node (Agent)** | `crm-ubuntulv57` |
+| **Physical Host** | `las-colo12-h19-20` |
+| **Agent OS** | Ubuntu 22.04 LTS, kernel `5.15.0-173-generic` |
+| **Agent Version** | `2024.12.0.177508` |
+| **Agent ID** | `f0ec3fb2-642e-f130-aa7e-2686f9881e6f` |
+| **Resource Pool** | `CRMBuildsLinux-Ubuntu22-04_LV` |
+| **Workspace** | `crm_lv` → `/prj/qct/pwlv2/...` and `/local/mnt/workspace/CRMBuilds/...` |
+| **Build Location** | `\\las-colo12-h19-20\Builds\DONTCOPY` / `/prj/qct/asw/crmbuilds/las-colo12-h19-20/Builds/DONTCOPY/SA_WLAN.HSP.1.1.5-00995-QCAHSPSWPL_V1_V2_SILICONZ-1.1` |
+| **Commander Endpoint** | `qso-bicmdr.qualcomm.com` |
+| **Commander Nodes** | `las-colo12-j13-09` (10.81.104.241), `las-colo12-j13-10` (10.81.104.242), `las-colo12-j13-11` |
+| **Start** | `2026-07-06T08:26:10.327Z` |
+| **Finish** | `2026-07-06T08:33:19.213Z` |
+| **Elapsed** | ~7 minutes 8 seconds (422,430 ms) |
+| **Final Status** | `completed` / `error` |
+| **Abort Status** | `ABORT` |
+| **Combined Status** | `running_error` |
+| **CRM DB Host** | `oil.qualcomm.com` |
+| **CRM DB Name** | `aswproductiondatabase` |
+| **Service Type** | Shadow Build |
+| **Software Image** | `WLAN.HSP.1.1.5` |
+| **Client** | `QCAHSPSWPL_V1_V2_SILICONZ` |
+| **Site** | LasVegas |
+| **Host OS** | Ubuntu22_04 |
+| **Workflow Type** | LEGACY |
+| **Build Delete Date** | `2026-07-09` |
+| **ArtifactCheckInCondition** | `0` (no artifacts checked in) |
+
+---
+
+## # 3 Build Timeline
+
+All times UTC. Local timestamps in logs are UTC-7 (PDT); converted to UTC below.
+
+| Time (UTC) | Event | Step | Outcome |
+|---|---|---|---|
+| `08:26:10.327Z` | Job created and started | — | — |
+| `08:26:11.160Z` | **Setup** begins on `crm-ubuntulv57` | Setup | Running |
+| `08:26:34.487Z` | **Setup** completes | Setup | ✅ `success` (exit 0, 23s) |
+| ~`08:26:34Z` | **ReserveHost** executes | ReserveHost | ✅ `success` |
+| ~`08:26:34Z` | **Init** executes | Init | ✅ `success` |
+| ~`08:26:34Z` | **SyncSetup** executes | SyncSetup | ✅ `success` |
+| ~`08:26:34Z` | **BBS_PreSync** executes | BBS_PreSync | ✅ `success` |
+| ~`08:26:34Z` | **Sync** executes | Sync | ✅ `success` |
+| ~`08:26:34Z` | **Strip** executes | Strip | ✅ `success` |
+| `08:28:53.384Z` | **BBS_PostSync** dispatched to agent | BBS_PostSync | Running |
+| `08:29:07.805Z` | **BBS_PostSync** completes | BBS_PostSync | ✅ `success` |
+| `08:29:07.834Z` | **Make** becomes runnable (dependency BBS_PostSync satisfied) | Make | Pending → Runnable |
+| `08:29:07.862Z` | **Make** transitions to pending/scheduled | Make | Scheduled |
+| ~`08:29:08Z` | **Make** dispatched to `crm-ubuntulv57`; build scripts begin | Make | Running |
+| `08:29:07.853Z` | **VerifySrc** skipped (condition `0` evaluated to `0`) | VerifySrc | ⏭️ `skipped` |
+| `08:29:07.846Z` | **ConcurrentCopy** skipped (condition `0` evaluated to `0`) | ConcurrentCopy | ⏭️ `skipped` |
+| `08:31:27.953Z` | **FinishCommandOperation** on `las-colo12-j13-09` receives Make result: `status OK`, **exit code 4** | Make | Completing |
+| `08:31:27.969Z` | **CommitCommandResultsOperation** on `las-colo12-j13-11` updates Make outcome: `success → error` | Make | Error |
+| `08:31:27.990Z` | **StepCompletionPrecondition** confirms `readyToComplete`, outcome=error | Make | Completing |
+| `08:31:27.991Z` | **StepCompletedAction** transitions Make: `running → completed/error` | Make | ❌ `error` (exit 4) |
+| `08:31:28.004Z` | **ResourceUsageFactoryImpl** deletes resource usage record for Make step | Make | Teardown |
+| ~`08:31:28Z` | **errorHandling=abortJob** triggers job-level abort | Job | Aborting |
+| ~`08:31:28Z` | **PreSave** executes (3/3 dependencies met) | PreSave | ✅ `success` |
+| ~`08:31:28Z` | **SaveBuild** executes; fails as downstream consequence of abort | SaveBuild | ❌ `error` |
+| ~`08:31:28Z` | **FixBuildStatus** executes (`alwaysRun=true`) on `crm-ubuntulv57` | FixBuildStatus | ✅ `success` |
+| ~`08:31:28Z` | **CleanUp** executes (`alwaysRun=true`) on `crm-ubuntulv57` | CleanUp | ✅ `success` |
+| ~`08:33:07Z` | **Concurrent job** `f179132c-ff3b-f1a1-8041-1ea035bf3243` dispatches step `Init Download Build` to same agent `crm-ubuntulv57` | Other Job | Running |
+| `08:33:18.913Z` | **PostTimingsToSplunk / Record_All_Times** API calls complete | Cleanup | — |
+| `08:33:19.213Z` | **Job finishes** | Job | ❌ `error / ABORT` |
+
+---
+
+## # 4 Execution Path Inventory
+
+### Failed Step
+
+| Field | Value |
+|---|---|
+| **Step Name** | `Make` |
+| **Step ID** | `f1791457-c82f-f1c2-9eb4-4efb9ff91010` |
+| **Parent Step ID** | `f1791457-bbad-f116-8041-1ea035bf3243` |
+| **Exit Code** | **4** |
+| **Step Status** | `completed` |
+| **Step Outcome** | `error` |
+| **Error Handling** | `abortJob` |
+| **Parallel** | `true` |
+| **Step Start** | ~`2026-07-06T08:29:08Z` |
+| **Step End** | `2026-07-06T08:31:27.991Z` |
+| **Duration** | ~2 minutes 20 seconds |
+| **Shell** | `bash` |
+| **Build Command** | `cd ./wlan_proc/build/ms; sh build.sh 6490.wlanfw.eval_v1_TO pgo_enable=true -k platform=silicon mac_num=2 ax_enable=true cnss_hw_version=hsp_wcss_r52; sh build.sh 6490.wlanfw.eval_v2_TO pgo_enable=true -k platform=silicon mac_num=2 ax_enable=true cnss_hw_version=hsp_wcss_r66` |
+
+### Agent Host
+
+| Field | Value |
+|---|---|
+| **Agent Name** | `crm-ubuntulv57` |
+| **Physical Host** | `las-colo12-h19-20` |
+| **OS** | Ubuntu 22.04 LTS, kernel `5.15.0-173-generic` |
+| **Agent Version** | `2024.12.0.177508` |
+| **Agent State** | `alive` (confirmed at dispatch time) |
+| **Port** | `7800` |
+| **Zone** | `default` (`f0d4fd89-2458-f124-abcb-2686f9881e6f`) |
+
+### Commander Hosts
+
+| Node | IP | Role |
+|---|---|---|
+| `las-colo12-j13-09` | `10.81.104.241` | API handler (FinishCommandOperation, findJobSteps) |
+| `las-colo12-j13-10` | `10.81.104.242` | API handler (getJobInfo, getJobDetails) |
+| `las-colo12-j13-11` | — | State machine execution (CommitCommandResults, StepCompletedAction) |
+
+### Invoked External Services (Setup Step — Confirmed in Step Command)
+
+| Service | URL | Purpose |
+|---|---|---|
+| CRM Database | `oil.qualcomm.com` | Build metadata DB (`aswproductiondatabase`) |
+| Axway / Stormchaser | `apigw-op.qualcomm.com` | Build workflow API gateway |
+| PCM WebService | `pcm.qualcomm.com` | Package/component management |
+| Software Revision Service | `csds.qualcomm.com` | Software revision lookup |
+| VerifySrc | `verifysrc.qualcomm.com` | Source verification |
+| ARM License Server | `license-pdlm-1-encnaa.qualcomm.com:7070` | ARM compiler license (`HWSKT-PRE0`) |
+
+---
+
+## # 5 Detected Error Codes
+
+| Code | Step | Source | Evidence |
+|---|---|---|---|
+| **Exit Code 4** | Make | `FinishCommandOperation` on `las-colo12-j13-09` at `08:31:27.953Z` | `"step completed with status OK but exit code 4"` — Splunk `index=ecommander`, `ec_debug` sourcetype |
+| **outcome=error** | Make | `CommitCommandResultsOperation` on `las-colo12-j13-11` at `08:31:27.969Z` | `"Updating jobStep[name=Make...] to outcome=error"` — Splunk `index=ecommander` |
+| **failedReason=Compile** | Job | `BuildInfoJson` property set on `las-colo12-j13-09` at `08:33:09Z` | `"failedReason=Compile"` in `setProperty /myJob/BuildInfoJson` — Splunk `index=ecommander` |
+| **AbortStatus=ABORT** | Job | CloudBees job metadata | Job error message: `"step 'Make' failed and its error handling aborted the job"` |
+| **ArtifactCheckInCondition=0** | Job | `BuildInfoJson` | No artifacts were checked in — build did not produce output |
+
+> **Note on Exit Code 4:** In GNU `make`, exit code 4 indicates that the make process itself was interrupted or encountered a fatal error (distinct from exit code 2 which means a build rule failed). In the context of a shell script wrapper (`sh build.sh ...`), exit code 4 is propagated from the underlying build tool and indicates a compile-time failure within the build script execution.
+
+---
+
+## # 6 Correlated Observations
+
+### CloudBees
+
+**Source:** Splunk `index=ecommander`, `ec_debug` sourcetype
+**Query Window:** `2026-07-06T08:26:00Z` → `2026-07-06T08:34:00Z`
+**Relevance:** Primary evidence source for job execution, step outcomes, and error codes.
+
+| Observation | Evidence | Confidence |
+|---|---|---|
+| Make step exited with code 4 | `FinishCommandOperation` log: `"status OK but exit code 4"` | HIGH |
+| Make outcome set to error | `CommitCommandResultsOperation` log: `"outcome success → error"` | HIGH |
+| `failedReason=Compile` explicitly set | `BuildInfoJson` setProperty log | HIGH |
+| `errorHandling=abortJob` triggered job abort | StepCompletedAction log | HIGH |
+| SaveBuild failed as downstream consequence | Job error message references both Make and SaveBuild | HIGH |
+| VerifySrc and ConcurrentCopy were skipped (not failed) | `JobStepFactoryImpl`: `"Skipping... '0' evaluated to '0'"` | HIGH |
+| Agent was alive at dispatch time | `CommandInvokerImpl`: `"agentStatus[state=alive]"` | HIGH |
+| Commander nodes performed normally | Hibernate queries 1–33ms; no DB issues | HIGH |
+| Concurrent job `f179132c-ff3b-f1a1-8041-1ea035bf3243` was running on same agent | `las-colo12-j13-11` dispatched `Init Download Build` to `crm-ubuntulv57` at `08:33:07Z` | MEDIUM |
+
+> **Note on Concurrent Job:** Job `f179132c-ff3b-f1a1-8041-1ea035bf3243` (workspace: `CI_WLAN.WBE.0.0-05055.1-QCAHKSWPL_SILICONZ-854`) was dispatched to `crm-ubuntulv57` at `08:33:07Z` — **after** the Make step had already failed at `08:31:27Z`. This concurrent job did **not** overlap with the Make step execution window and is therefore **not a contributing factor** to the Make failure. It is noted for completeness only.
+
+---
+
+### Agent Host
+
+**Source:** Datadog metrics for `host:las-colo12-h19-20`
+**Query Window:** `2026-07-06T07:00:00Z` → `2026-07-06T09:00:00Z`
+**Relevance:** Agent host `las-colo12-h19-20` is the physical machine running `crm-ubuntulv57` where the Make step executed.
+
+| Metric | Observation | Confidence |
+|---|---|---|
+| **`system.disk.free`** | **0 bytes** at every sample point across all 240 data points from 07:00Z to 09:00Z. Disk was fully exhausted **before the job started** and remained so throughout. | HIGH |
+| **`system.disk.used`** | Ranged ~119–124 GB baseline; **spiked to ~133–156 GB** during the Make step window (08:23–08:35Z bins). Peak of ~156 GB observed at 07:17Z bin. | HIGH |
+| **`system.disk.in_use`** | Value of `1` (100%) at every sampled point throughout the entire window. | HIGH |
+| **`system.cpu.user`** | Very low: 0.02%–1.31% peak. **No CPU pressure.** | HIGH |
+| **`system.cpu.system`** | Very low: 0.03%–1.21% peak. **No CPU pressure.** | HIGH |
+| **`system.mem.pct_usable`** | Consistently ~97.8%–97.9% usable. **No memory pressure.** | HIGH |
+
+> **Critical Infrastructure Finding:** The disk on `las-colo12-h19-20` was **completely full (0 bytes free)** for the entire observation window, including well before the job started. The disk used spiked by approximately **7.5–9.5 GB** during the Make step execution window, consistent with build artifact generation attempting to write to a full disk. However, the CloudBees agent reported `status OK` (not a disk I/O error), and the `BuildInfoJson` explicitly classifies the failure as `Compile` — not `Storage` or `Infrastructure`. Without direct step execution logs, it cannot be definitively determined whether the compile failure was **caused by** disk exhaustion (e.g., compiler unable to write object files) or was an **independent code-level compile error** that happened to occur on a full-disk host.
+
+---
+
+### Commander Host
+
+**Source:** Splunk `index=ecommander`, `ec_debug` sourcetype
+**Query Window:** `2026-07-06T08:26:00Z` → `2026-07-06T08:34:00Z`
+**Relevance:** Commander nodes orchestrate job execution and state transitions.
+
+| Observation | Evidence | Confidence |
+|---|---|---|
+| Commander nodes `las-colo12-j13-09`, `-10`, `-11` all functioned normally | Hibernate queries 1–33ms; API threads 60–125% CPU (normal for active job) | HIGH |
+| No Commander-side errors detected | All state transitions completed correctly; no timeout or DB errors | HIGH |
+| Commander correctly processed exit code 4 and set outcome=error | `CommitCommandResultsOperation` log | HIGH |
+
+**Commander Contribution to Failure:** NONE. Commander nodes performed correctly throughout the job lifecycle.
+
+---
+
+### Datadog
+
+**Source:** Datadog Metrics API, host `las-colo12-h19-20`
+**Query Window:** `2026-07-06T07:00:00Z` → `2026-07-06T09:00:00Z`
+**Relevance:** Agent host telemetry for CPU, memory, and disk during the Make step execution window.
+
+| Finding | Metric | Value | Relevance |
+|---|---|---|---|
+| Disk fully exhausted | `system.disk.free` | 0 bytes (all 240 points) | DIRECTLY relevant to agent host |
+| Disk used spiked during Make | `system.disk.used` | ~124 GB → ~133 GB during Make window | DIRECTLY relevant to agent host |
+| No CPU pressure | `system.cpu.user` + `system.cpu.system` | <1.5% throughout | No contribution to failure |
+| No memory pressure | `system.mem.pct_usable` | ~97.8% usable throughout | No contribution to failure |
+
+**SCOM Alerts:** No active SCOM alerts found for `las-colo12-h19-20`.
+
+---
+
+### Splunk
+
+**Source:** Splunk `index=ecommander`
+**Query Window:** `2026-07-06T08:26:00Z` → `2026-07-06T08:34:00Z` (primary); `-7d` for job discovery
+**Relevance:** Primary CloudBees log source.
+
+All findings documented above under CloudBees section. No additional Splunk sources queried (no agent OS logs, no build tool logs available in `index=ecommander`).
+
+---
+
+### External Dependency
+
+**Source:** Splunk `index=ecommander` (Setup step command inspection)
+**Query Window:** `2026-07-06T08:26:11Z` → `2026-07-06T08:26:34Z` (Setup step only)
+**Relevance:** External services are invoked during Setup, not during Make.
+
+| Service | Status | Evidence |
+|---|---|---|
+| `oil.qualcomm.com` (CRM DB) | Setup completed exit 0 in 23s | Setup step success |
+| `apigw-op.qualcomm.com` (Axway) | Setup completed exit 0 in 23s | Setup step success |
+| `pcm.qualcomm.com` (PCM) | Setup completed exit 0 in 23s | Setup step success |
+| `csds.qualcomm.com` (SoftwareRevision) | Setup completed exit 0 in 23s | Setup step success |
+| `verifysrc.qualcomm.com` | Setup completed exit 0 in 23s | Setup step success |
+| `license-pdlm-1-encnaa.qualcomm.com:7070` (ARM License) | No evidence of failure | Setup step success; ARM license env var set |
+
+> **Note:** All external services were accessed during the **Setup** step, which completed successfully (exit 0). There is **no evidence** that any external service failure contributed to the Make step failure. The ARM license server (`license-pdlm-1-encnaa.qualcomm.com:7070`) is the most relevant to a compile failure (ARM compiler license), but no license denial or timeout was observed in available logs. Direct step execution logs would be required to confirm or exclude ARM license issues during the Make step.
+
+---
+
+## # 7 Probable Root Cause
+
+### Primary Root Cause: Compile Failure (Exit Code 4)
+
+**Evidence:**
+1. Make step exited with **exit code 4** — confirmed by `FinishCommandOperation` log on `las-colo12-j13-09` at `08:31:27.953Z`
+2. `BuildInfoJson` explicitly records **`failedReason=Compile`** — set by the CRM build framework post-failure
+3. **No artifacts were checked in** (`ArtifactCheckInCondition=0`) — build produced no output
+4. The build command executed two firmware build scripts: `build.sh 6490.wlanfw.eval_v1_TO` and `build.sh 6490.wlanfw.eval_v2_TO` targeting `platform=silicon`, `mac_num=2`, `ax_enable=true`, `cnss_hw_version=hsp_wcss_r52/r66`, `pgo_enable=true`
+5. The agent reported `status OK` — the step executed and completed from an infrastructure standpoint; the non-zero exit code originated from within the build scripts themselves
+
+**Interpretation:** The `make`/build process encountered a compile-time error during WLAN HSP firmware compilation. Exit code 4 from a `make`-based build system indicates a fatal build error. The CRM framework's own classification (`failedReason=Compile`) is the authoritative classification.
+
+---
+
+### Contributing Infrastructure Condition: Disk Exhaustion on Agent Host
+
+**Evidence:**
+1. `system.disk.free` = **0 bytes** at every sample point from 07:00Z to 09:00Z (240 consecutive data points)
+2. `system.disk.used` spiked from ~124 GB to ~133 GB during the Make step execution window (08:23–08:35Z)
+3. `system.disk.in_use` = 1 (100%) throughout the entire window
+4. Disk was fully exhausted **at least 86 minutes before the job started**
+
+**Assessment:** Disk exhaustion is a **confirmed infrastructure condition** on the agent host. It is **plausible** that a full disk caused the compiler to fail when attempting to write object files, intermediate build artifacts, or output binaries — which would manifest as a compile error with a non-zero exit code. However:
+- The CloudBees agent reported `status OK` (not a disk write error or I/O failure)
+- The `BuildInfoJson` classifies the failure as `Compile`, not `Storage` or `Infrastructure`
+- Direct step execution logs (compiler output, `stderr`) are not available in `index=ecommander`
+
+**Classification:** This is a **possible contributing factor** to the compile failure. It cannot be elevated to primary root cause without direct step log evidence.
+
+---
+
+## # 8 Confidence Level
+
+### Primary Root Cause (Compile Failure): **HIGH**
+
+**Reason:**
+- Exit code 4 is directly evidenced in `FinishCommandOperation` logs
+- `failedReason=Compile` is explicitly set by the CRM build framework in `BuildInfoJson`
+- Both are direct CloudBees metadata from the job execution path
+- No artifacts produced confirms build did not complete
+
+### Contributing Infrastructure Condition (Disk Exhaustion): **HIGH** (condition confirmed) / **MEDIUM** (causal link to compile failure)
+
+**Reason:**
+- Disk exhaustion is confirmed by 240 consecutive Datadog data points showing 0 bytes free
+- The causal link between disk exhaustion and the specific compile exit code is **MEDIUM** because:
+  - Agent reported `status OK` (not a disk error)
+  - CRM classified as `Compile` not `Storage`
+  - Step execution logs (compiler stderr) are not available to confirm disk write failures
+
+---
+
+## # 9 Infrastructure vs Code Assessment
+
+| Assessment | Result |
+|---|---|
+| **Infrastructure Issue** | **YES** — Disk on agent host `las-colo12-h19-20` was fully exhausted (0 bytes free) throughout the job window |
+| **Code Issue** | **YES** — Exit code 4 and `failedReason=Compile` indicate a compile-time failure in the WLAN HSP firmware build scripts |
+| **Mixed** | **YES** |
+
+**Reason:**
+
+The evidence supports a **Mixed** classification:
+
+- **Code/Compile failure** is the authoritative classification per the CRM build framework (`failedReason=Compile`, exit code 4). The build scripts for `6490.wlanfw.eval_v1_TO` and `6490.wlanfw.eval_v2_TO` failed to compile successfully.
+- **Infrastructure failure** (disk exhaustion) is confirmed on the agent host and is a plausible contributing cause — a full disk would prevent the compiler from writing object files or output binaries, which would manifest as a compile error. However, the causal link is not proven without step execution logs.
+- The most likely scenario is that **disk exhaustion caused the compiler to fail**, which the CRM framework correctly classified as a compile failure (since the failure manifested as a compile error, regardless of the underlying cause).
+
+---
+
+## # 10 Recommended Remediation
+
+### Immediate Actions
+
+1. **Investigate disk exhaustion on `las-colo12-h19-20`**
+   - Identify which files/directories are consuming disk space: `du -sh /prj/qct/asw/crmbuilds/las-colo12-h19-20/Builds/DONTCOPY/*`
+   - Check for stale build artifacts from previous jobs that were not cleaned up
+   - Check the `BuildDeleteDate` of existing builds — `2026-07-09` suggests builds are retained for 3 days; verify cleanup jobs are running
+   - Free disk space before re-running this build
+
+2. **Re-run the failed build** after disk space is freed
+   - Job: `SA_WLAN.HSP.1.1.5-00995-QCAHSPSWPL_V1_V2_SILICONZ-1.1`
+   - Requester: `clagan`
+   - If the build fails again after disk is freed, the failure is a pure code/compile issue
+
+3. **Examine Make step execution logs directly**
+   - Log file: `Make.f1791457-c82f-f1c2-9eb4-4efb9ff91010.log` on `crm-ubuntulv57`
+   - Path: `/prj/qct/asw/crmbuilds/las-colo12-h19-20/Builds/DONTCOPY/SA_WLAN.HSP.1.1.5-00995-QCAHSPSWPL_V1_V2_SILICONZ-1.1/`
+   - Look for: `No space left on device`, compiler errors, missing symbols, or ARM license denial messages
+
+4. **Check ARM license server availability** during the Make step window
+   - Server: `license-pdlm-1-encnaa.qualcomm.com:7070`
+   - Verify no license denials occurred between `08:29:08Z` and `08:31:27Z`
+
+---
+
+## # 11 Preventive Actions
+
+### Disk Management
+
+1. **Implement disk space pre-flight check** in the CloudBees procedure before the Make step
+   - Add a step that checks `df -h` on the agent and fails fast with a clear error if free space is below a threshold (e.g., 20 GB)
+   - This prevents wasted build time and provides a clear `Storage Failure` classification
+
+2. **Implement automated disk cleanup** for the `Builds/DONTCOPY` directory
+   - Enforce `BuildDeleteDate` cleanup jobs to run on schedule
+   - Consider reducing build retention from 3 days if disk pressure is chronic
+
+3. **Add Datadog disk space monitor for `las-colo12-h19-20`**
+   - Alert when `system.disk.free` drops below a threshold (e.g., 10 GB or 10%)
+   - Current state: 0 bytes free for 2+ hours with no active alert
+
+4. **Implement agent resource pre-validation** in the `ReserveHost` step
+   - Validate minimum disk space, CPU, and memory before dispatching the Make step
+
+### Build Reliability
+
+5. **Investigate the reference build** `WLAN.HSP.1.1.5-00995-QCAHSPSWPL_V1_V2_SILICONZ-1` to determine if the same compile error exists in the source tree
+   - If the reference build also failed, this is a code regression
+   - If the reference build succeeded, disk exhaustion is the likely cause of this failure
+
+6. **Review `build.sh` exit code handling** for `6490.wlanfw.eval_v1_TO` and `6490.wlanfw.eval_v2_TO`
+   - Ensure build scripts propagate meaningful exit codes and write diagnostic output to stderr
+
+7. **Enable build log forwarding to Splunk** for Make step execution logs
+   - Currently, step execution logs are not available in `index=ecommander`
+   - Forwarding compiler output would enable faster RCA in future failures
+
+---
+
+## # 12 Sources Used
+
+| # | Source Type | Query Window | Evidence | Relevance |
+|---|---|---|---|---|
+| 1 | **Splunk** `index=ecommander` | `-7d` (discovery) | Job ID, Job Name, Project, Procedure, Build ID, LaunchedBy, BuildRequester, RunAs, Start/Finish times, Agent, PhysicalHost, OS, AgentVersion, Commander nodes, `failedReason=Compile`, `BuildInfoJson` | Primary CloudBees job metadata |
+| 2 | **Splunk** `index=ecommander` | `08:26:00Z–08:34:00Z` | Exit code 4 (`FinishCommandOperation`), outcome=error (`CommitCommandResultsOperation`), StepCompletedAction transitions, ResourceUsageFactoryImpl teardown | Direct step failure evidence |
+| 3 | **Splunk** `index=ecommander` | `08:26:00Z–08:34:00Z` | Setup step command (full text), external service URLs, ARM license server, CRM DB host | Execution path inventory |
+| 4 | **Splunk** `index=ecommander` | `08:26:00Z–08:34:00Z` | BBS_PostSync completion, Make dependency chain, VerifySrc/ConcurrentCopy skipped, PreSave/SaveBuild outcomes | Build timeline reconstruction |
+| 5 | **Splunk** `index=ecommander` | `08:26:00Z–08:34:00Z` | Concurrent job `f179132c-ff3b-f1a1-8041-1ea035bf3243` dispatched to `crm-ubuntulv57` at `08:33:07Z` | Concurrent job identification (post-failure, not contributing) |
+| 6 | **Datadog Metrics** `system.disk.free` | `07:00:00Z–09:00:00Z` | 0 bytes free at all 240 sample points | Disk exhaustion on agent host |
+| 7 | **Datadog Metrics** `system.disk.used` | `07:00:00Z–09:00:00Z` | ~119–156 GB used; spiked ~124→133 GB during Make window | Disk usage spike during Make step |
+| 8 | **Datadog Metrics** `system.disk.in_use` | `08:26:00Z–08:34:00Z` | Value 1 (100%) at all points | Disk saturation confirmation |
+| 9 | **Datadog Metrics** `system.cpu.user`, `system.cpu.system` | `08:26:00Z–08:34:00Z` | <1.5% throughout — no CPU pressure | CPU ruled out as contributing factor |
+| 10 | **Datadog Metrics** `system.mem.pct_usable` | `08:26:00Z–08:34:00Z` | ~97.8–97.9% usable — no memory pressure | Memory ruled out as contributing factor |
+| 11 | **Datadog Host Inventory** | Current | `las-colo12-h19-20` confirmed in Datadog, OS: GNU/Linux | Agent host telemetry coverage confirmed |
+| 12 | **SCOM** `scom_get_alerts_for_host` | Current (active alerts) | No active SCOM alerts for `las-colo12-h19-20` | No SCOM-level infrastructure alerts |
+
+---
+
+> **Step Execution Log Gap:** The Make step execution log (`Make.f1791457-c82f-f1c2-9eb4-4efb9ff91010.log`) is **not available** in `index=ecommander`. This log would contain the compiler output, error messages, and any `No space left on device` errors that would definitively confirm whether disk exhaustion caused the compile failure or whether it was an independent code-level error. **This log must be examined directly on `crm-ubuntulv57` to achieve HIGH confidence on the causal link between disk exhaustion and the compile failure.**

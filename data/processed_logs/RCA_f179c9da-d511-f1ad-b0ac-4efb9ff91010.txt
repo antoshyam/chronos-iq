@@ -1,0 +1,185 @@
+Root Cause Analysis Report
+Job ID: f179c9da-d511-f1ad-b0ac-4efb9ff91010  |  Build: WLAN.TFH.3.6.c2-00721-QCATFSWPZ-1  |  Outcome: ERROR / ABORTED
+
+---
+1. Executive Summary
+CloudBees job f179c9da-d511-f1ad-b0ac-4efb9ff91010 failed during the "VerifySrc" step with exit code 2 on agent host crm-ubuntu221. The CloudBees execution context classifies the failure reason as "Aborted".
+
+This job is the most infrastructure-stressed case across all 8 jobs analyzed, with the highest IO await values recorded in the entire session:
+
+IO await peaked at 70.67ms at 06:07:40Z — 1 minute 34 seconds before the VerifySrc step even started — and remained elevated (24–35ms) throughout the entire step window. This is 7× higher than the previous worst (san-w175-ja4-6-06 at 35.7ms) and 6.5× higher than the Snapdragon Auto job (10.84ms).
+~97MB inbound in 8 seconds at 06:07:04–06:07:16Z triggered the initial IO storm, followed by a sustained ~555MB outbound transfer — the largest outbound volume across all 8 jobs.
+System load never dropped below 2.78 throughout the entire 6-minute observation window — this host was chronically overloaded, not transiently stressed. Load peaked at 3.87.
+IO await remained at 24–35ms throughout the entire VerifySrc step (06:09:14–06:10:25Z) — the step ran under continuous, severe IO contention from start to finish.
+Probable Root Cause: A massive pre-step network burst (~97MB inbound in 8 seconds) caused extreme IO contention (70.67ms await, 27–32% util) as downloaded data was flushed to disk. The storage subsystem never recovered before VerifySrc started — the step ran under continuous 24–35ms IO await throughout its 71-second duration. The VerifySrc upload operation (~555MB total outbound) stalled under IO contention, exceeded a timeout threshold, and was aborted. Exit code 2 and "Aborted" classification confirm external termination. The chronically high load (2.78–3.87) indicates concurrent workloads were also competing for resources on this host.
+
+⚠️ No application-level logs are forwarded from crm-ubuntu221 to Datadog. The Datadog Agent is installed and reporting metrics, but no log pipeline is configured. Step-level stdout/stderr must be retrieved directly from CloudBees.
+
+---
+2. Job Context
+Job ID: f179c9da-d511-f1ad-b0ac-4efb9ff91010
+Job Name: WLAN.TFH.3.6.c2-00721-QCATFSWPZ-1_20260706_230515_230529
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: VerifySrc (Step ID: f179c9da-e11f-f1b7-a6c8-2686f9881e6f)
+Exit Code: 2 — script-level abort (4th consecutive VerifySrc exit 2 across the session)
+Agent Host: crm-ubuntu221 (GNU/Linux, Datadog Agent 7.64.1 ✅ — metrics available, no log pipeline)
+Build Name: WLAN.TFH.3.6.c2-00721-QCATFSWPZ-1
+Declared Failure Reason: Aborted
+Build Type: WLAN TFH 3.6.c2-00721 — QCATFSWPZ-1 variant (note: QCATFSWPZ-2 of the same base build failed on san-w175-ha1-4-07 as job f179cb72)
+Step Duration: ~71 seconds (06:09:14 → 06:10:25Z)
+Job Duration: ~12m 46s (06:05:29 → 06:18:14Z)
+Agent Rack: crm-ubuntu2xx — same fleet as jobs f179cb71 (crm-ubuntu232) and f179cba9 (crm-ubuntu327)
+Disk Usage: 9.34–9.43% — very low, no exhaustion risk
+Memory: ~192–193GB usable — no pressure
+---
+3. Build Timeline
+Time (UTC)	Event	Detail
+2026-07-07 06:05:29	Job Started	CRMBuilds / Build.Rel.602829 initiated on crm-ubuntu221. Load already at 2.78.
+~06:07:04–06:07:16Z	⚡ MASSIVE Inbound Burst	~48MB + ~49MB = ~97MB inbound in 8 seconds — extreme download burst. Simultaneously: ~29.5MB + ~36.4MB outbound begins.
+~06:07:40Z	⚡ IO AWAIT PEAKS AT 70.67ms	IO await: 70.67ms | IO util: 27.47% | CPU iowait: 3.55% — highest IO await across all 8 jobs. Storage subsystem severely saturated by download write flush. Load rises to 3.10.
+~06:07:40–06:09:14Z	⚡ Sustained IO Contention + Outbound Storm	IO await: 66.80ms → 31.16ms → 13.93ms → 10.65ms — declining but still severely elevated. Outbound: ~79.59MB + ~47.95MB + ~34.49MB + ~43.71MB peaks. Total outbound ~555MB across window. Load: 3.44–3.87.
+2026-07-07 06:09:14	VerifySrc Step Started	Step begins — Correlation Window Opens. IO await still at 10.65ms (point 13). Load at 3.63–3.87. Storage subsystem has NOT recovered from pre-step IO storm.
+~06:09:20Z	⚡ IO Await Spikes Again: 35.53ms	IO await: 35.53ms — 6 seconds into step. Second IO spike during step execution. Inbound: ~58.65MB burst. Load: 3.75.
+06:09:14–06:10:25Z	Step Runs Under Continuous IO Contention	IO await: 35.53ms → 11.24ms → 28.23ms → 24.78ms — never drops below 11ms during entire step. CPU user: 0.65–3.99%. Load: 3.34–3.77.
+2026-07-07 06:10:25	VerifySrc Step ABORTED	Exit Code 2 — step terminated — Correlation Window Closes (duration: ~71s). IO await still at 24.78ms at step end.
+2026-07-07 06:18:14	Job Ended	Job terminates with outcome: error (~7m 49s post-step — extended cleanup)
+---
+4. Execution Path Inventory
+Failed Step: "VerifySrc" — source verification step; massive pre-step download (~97MB in 8s) and sustained outbound transfer (~555MB) during/around step
+Agent Host: crm-ubuntu221 (GNU/Linux, Datadog Agent 7.64.1 — metrics available, no log pipeline)
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Invoked Services: Source repository (~97MB inbound pre-step + ~58.65MB + ~33.15MB during step); remote upload endpoint (~555MB outbound — same unknown endpoint as WLAN TFH jobs on san-w175 agents)
+Storage Subsystem: Directly in execution path — IO await 70.67ms peak, never recovered before step started
+Concurrent Workloads: Load 2.78–3.87 throughout — multiple concurrent processes confirmed
+---
+5. Detected Error Codes & Signals
+Code / Signal	Source	Meaning	Evidence
+Exit Code 2	CloudBees Step Metadata	Script-level abort — timeout or transfer failure. 4th consecutive VerifySrc exit 2 across the session (f179ca58, f179cb7a, f179cb72, f179c9da).	failedStep.exitCode = "2"
+Aborted	CloudBees executionContext	Step terminated before natural completion	executionContext.failedReason = "Aborted"
+IO Await Peak 70.67ms ⚠️	Datadog Metrics — crm-ubuntu221	Highest IO await across all 8 jobs. Storage device wait time peaked at 70.67ms at 06:07:40Z — 1m 34s before step start. Indicates severe storage subsystem saturation. A 70ms await means processes waited an average of 70ms per IO operation — catastrophic for any IO-intensive workload.	system.io.await = 70.67ms at point 5 (06:07:40Z)
+IO Await Sustained 24–66ms Pre-Step	Datadog Metrics — crm-ubuntu221	IO await remained at 66.80ms → 31.16ms → 13.93ms → 10.65ms from 06:07:40Z to step start at 06:09:14Z — storage never recovered before step began	system.io.await points 7–13 (06:08:00–06:09:00Z)
+IO Await 11–35ms During Entire Step	Datadog Metrics — crm-ubuntu221	IO await never dropped below 11.24ms during the step window (06:09:14–06:10:25Z). The step ran under continuous severe IO contention from start to finish. No recovery window.	system.io.await points 15–21 (06:09:20–06:10:20Z): 35.53 → 11.24 → 28.23 → 24.78ms
+IO Util 27–32% Pre-Step	Datadog Metrics — crm-ubuntu221	IO utilization 27.47–32.20% from 06:07:40–06:08:40Z — storage device under heavy sustained load. Combined with 70ms await, confirms slow storage device (spinning HDD or congested NFS).	system.io.util points 5–11 (06:07:40–06:08:40Z)
+CPU iowait Peak 3.55%	Datadog Metrics — crm-ubuntu221	CPU iowait peaked at 3.55% at 06:07:40Z — processes blocked waiting for IO. Matches IO await peak exactly.	system.cpu.iowait = 3.55% at point 4 (06:07:30Z)
+Inbound Burst ~97MB in 8s	Datadog Metrics — crm-ubuntu221	~48MB + ~49MB received in 8 seconds at 06:07:04–06:07:16Z — extreme download rate (~97 MB/s). This burst directly triggered the IO await spike as data was flushed to disk.	system.net.bytes_rcvd peaks at 2s intervals 3–5
+Outbound ~555MB Total	Datadog Metrics — crm-ubuntu221	Largest outbound volume across all 8 jobs. Sustained upload from 06:07:08Z through step end. Peak single interval: 79.59MB. Total ~555MB outbound.	system.net.bytes_sent sustained across entire window
+Load 2.78–3.87 (Never Below 2.78)	Datadog Metrics — crm-ubuntu221	Chronically overloaded host. Load never dropped below 2.78 throughout the entire 6-minute window. This is not a transient spike — the host was under sustained concurrent workload pressure throughout the job.	system.load.1 range 2.78–3.87 across all data points
+CPU Stolen = 0	Datadog Metrics — crm-ubuntu221	No hypervisor CPU theft — VM-level contention excluded	system.cpu.stolen = 0 throughout
+---
+6. Correlated Observations
+CloudBees
+Step "VerifySrc" failed with exit code 2 and failure reason "Aborted" — 4th consecutive VerifySrc abort across the session
+Step duration: ~71 seconds — consistent with a transfer that stalled under IO contention and hit a timeout
+Build: WLAN.TFH.3.6.c2-00721-QCATFSWPZ-1 — variant "-1" of the same base build whose variant "-2" failed on san-w175-ha1-4-07 (job f179cb72). Both variants of WLAN.TFH.3.6.c2-00721 failed VerifySrc with exit code 2 and "Aborted".
+Confidence: HIGH
+Agent Host (crm-ubuntu221) — KEY FINDINGS
+✅ Datadog Agent 7.64.1 installed — full metric telemetry available
+
+🔴 MOST SEVERE INFRASTRUCTURE STRESS ACROSS ALL 8 JOBS — IO await 70.67ms, load never below 2.78, ~555MB outbound
+
+IO await 70.67ms — 7× higher than the previous worst in this session. At 70ms per IO operation, any process performing sequential IO would be severely throttled.
+Storage never recovered — IO await was still 10.65ms when the step started and 24.78ms when it ended. The step ran under continuous IO contention throughout its entire 71-second duration.
+~97MB inbound in 8 seconds — the fastest download rate across all 8 jobs. This extreme burst rate overwhelmed the storage subsystem's ability to flush buffers to disk.
+~555MB outbound — the largest outbound volume across all 8 jobs. The upload was already in progress before the step started and continued throughout.
+Chronically high load (2.78–3.87) — unlike other jobs where load spiked transiently, this host maintained a load above 2.78 for the entire observation window. This indicates multiple concurrent jobs or processes were running simultaneously, competing for IO and CPU resources.
+Disk: 9.34–9.43% — very low, no exhaustion risk. The IO contention is from device speed/congestion, not disk space.
+Memory: ~192–193GB usable — no memory pressure.
+Cross-Fleet Comparison — IO Await Across All 8 Jobs:
+
+Job	Host	IO Await Peak	During Step?	Outcome
+f179c9da (this)	crm-ubuntu221	70.67ms	Pre-step + throughout step (11–35ms)	Aborted exit 2
+f179cb7a	san-w175-ja4-6-06	35.7ms	During step	Aborted exit 2
+f179cb72	san-w175-ha1-4-07	15.97ms	Pre-step only	Aborted exit 2
+f179c9e2	san-w175-ma3-2-05	10.84ms	During step	Make exit 4
+f179ca58	san-w175-ha1-4-07	2.13ms	Pre-step only	Aborted exit 2
+f179cb71	crm-ubuntu232	0.32ms	During step (idle)	Exit 0 (validation)
+Commander Host
+No Commander host identified — OUT_OF_SCOPE
+Datadog — Logs & Incidents
+Zero log entries from crm-ubuntu221 — no log pipeline configured
+Zero Artifactory LDAP errors during this job's window — LDAP excluded
+Zero active incidents during the job execution window
+Cross-Job Pattern — 4th WLAN TFH VerifySrc Abort
+🔴 SYSTEMIC PATTERN — NOW 4 JOBS, 3 DIFFERENT AGENTS, 2 DIFFERENT FLEETS:
+
+f179ca58 — san-w175-ha1-4-07 — WLAN TFH 3.7.1 QCATFSWPZ-1
+f179cb7a — san-w175-ja4-6-06 — WLAN TFH 3.7.1 QCATFSWPZ-2
+f179cb72 — san-w175-ha1-4-07 — WLAN TFH 3.6.c2 QCATFSWPZ-2
+f179c9da — crm-ubuntu221 — WLAN TFH 3.6.c2 QCATFSWPZ-1
+This job extends the pattern to the crm-ubuntu fleet (previously only san-w175 agents were affected). The failure now spans two distinct agent fleets, confirming the root cause is in the VerifySrc script or its remote endpoint — not in any specific agent fleet's infrastructure.
+---
+7. Probable Root Cause
+Primary: Extreme IO Contention (70.67ms await) Caused by Massive Pre-Step Download → VerifySrc Upload Abort
+
+A massive inbound burst (~97MB in 8 seconds) at 06:07:04–06:07:16Z overwhelmed the storage subsystem on crm-ubuntu221, causing IO await to spike to 70.67ms — the highest across all 8 jobs. The storage device never recovered before VerifySrc started at 06:09:14Z (IO await still 10.65ms at step start). The step ran under continuous IO contention (11–35ms await) throughout its 71-second duration. The VerifySrc upload operation (~555MB outbound) stalled under IO contention, exceeded a timeout threshold, and was aborted with exit code 2.
+
+Contributing Factor — Chronic Host Overload: The load average never dropped below 2.78 throughout the entire observation window, indicating multiple concurrent jobs or processes were running on crm-ubuntu221. This chronic overload amplified the IO contention and prevented recovery between operations.
+
+Causal Chain:
+
+crm-ubuntu221 is already under load (2.78) when the job starts at 06:05:29Z
+Job setup initiates massive download: ~97MB inbound in 8 seconds at 06:07:04–06:07:16Z
+Storage subsystem overwhelmed by download write flush — IO await spikes to 70.67ms at 06:07:40Z
+Simultaneous outbound transfer begins (~555MB total) — network-IO storm compounds storage stress
+IO await remains elevated (10–66ms) for 1m 34s — storage never recovers before step starts
+VerifySrc step starts at 06:09:14Z — IO await still 10.65ms, rising to 35.53ms within 6 seconds
+Step runs under continuous IO contention (11–35ms) for its entire 71-second duration
+Upload operation stalls under IO contention → timeout exceeded → abort triggered
+VerifySrc exits with code 2 at 06:10:25Z — CloudBees classifies as "Aborted"
+Supporting Evidence:
+
+IO await 70.67ms peak at 06:07:40Z — highest across all 8 jobs (Datadog system.io.await)
+IO await 11–35ms throughout entire step — no recovery window (Datadog system.io.await)
+IO util 27–32% pre-step — storage device under heavy load (Datadog system.io.util)
+CPU iowait 3.55% — processes blocked on IO (Datadog system.cpu.iowait)
+~97MB inbound in 8s — extreme download rate triggering IO storm (Datadog system.net.bytes_rcvd)
+~555MB outbound — largest across all 8 jobs (Datadog system.net.bytes_sent)
+Load 2.78–3.87 never below 2.78 — chronic host overload (Datadog system.load.1)
+Exit code 2 + "Aborted" — external termination confirmed (CloudBees metadata)
+CPU stolen = 0% — hypervisor contention excluded (Datadog system.cpu.stolen)
+No LDAP failures — authorization excluded (Datadog logs)
+---
+8. Confidence Level
+✅ HIGH (infrastructure cause) / MEDIUM (specific abort trigger)
+
+HIGH confidence that extreme IO contention (70.67ms) occurred and directly impacted the VerifySrc step — direct metric evidence with precise timestamps
+HIGH confidence that the ~97MB inbound burst triggered the IO storm — timing correlation is exact (burst at 06:07:04Z, IO peak at 06:07:40Z — 36 seconds later, consistent with buffer flush delay)
+HIGH confidence that the step ran under continuous IO contention — IO await never below 11ms during step
+HIGH confidence that this is part of the systemic WLAN TFH VerifySrc abort pattern — 4th job, 3rd agent, 2nd fleet
+MEDIUM confidence on the specific abort trigger — step logs required to confirm whether the abort was triggered by IO timeout, upload failure, or script-level detection
+---
+9. Infrastructure vs Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue (Agent)	YES — CONFIRMED	IO await 70.67ms — extreme storage contention directly impacted step execution. Chronic host overload (load 2.78–3.87). The agent's storage subsystem was severely inadequate for the concurrent IO demands placed on it.
+Infrastructure Issue (Remote Endpoint)	POSSIBLE	The remote upload endpoint (~555MB outbound) may also have been slow or unavailable, compounding the local IO contention. Cannot confirm without step logs.
+Code Issue	NO — UNLIKELY	Exit code 2 + "Aborted" indicate external termination. No compiler errors. The WLAN source tree is not implicated.
+Mixed	POSSIBLE	Local IO contention confirmed + remote endpoint possibly contributing.
+---
+10. Recommended Remediation
+Retrieve VerifySrc step logs from CloudBees: Access job f179c9da-d511-f1ad-b0ac-4efb9ff91010 → Step "VerifySrc" → View Log. Confirm the exact abort trigger and the destination of the ~555MB outbound transfer.
+Investigate concurrent job count on crm-ubuntu221: The load never dropped below 2.78 — this host was running multiple concurrent jobs. Check CloudBees agent configuration for crm-ubuntu221 and reduce concurrent job slots to prevent IO contention between simultaneous builds.
+Investigate storage device on crm-ubuntu221: A 70.67ms IO await at 27–32% utilization indicates a severely slow storage device. Check whether the build workspace is on a spinning HDD or congested NFS mount. This is the most urgent storage investigation across all 8 jobs.
+Serialize download and upload operations: The ~97MB download and ~555MB upload should not occur simultaneously. Stagger these operations to prevent the network-IO storm that triggered the 70.67ms IO spike.
+Re-run the build after reducing concurrent job load on crm-ubuntu221 and confirming storage health.
+---
+11. Preventive Actions
+Configure Datadog Log Pipeline on crm-ubuntu221: 8th consecutive job without log forwarding. Fleet-wide log pipeline configuration is urgently needed across both crm-ubuntu and san-w175 fleets.
+Add IO Wait Monitor — Critical Threshold: Create a Datadog monitor on system.io.await alerting at >20ms for all CRM build agents. A 70.67ms spike would have triggered an alert 1m 34s before the step started.
+Concurrent Job Limit on crm-ubuntu221: The chronically high load (2.78–3.87) confirms this host is over-subscribed. Reduce concurrent job slots immediately.
+Storage Upgrade — crm-ubuntu Fleet: The crm-ubuntu fleet's storage subsystem cannot handle concurrent large downloads and uploads. Migrate build workspaces to SSD or a dedicated high-performance NFS tier.
+VerifySrc Script Hardening: Implement retry logic, IO-aware throttling, and increased timeouts in the VerifySrc script for WLAN TFH builds. The script should detect IO contention and back off rather than aborting immediately.
+Pre-Step IO Gate: Add a pre-step check that measures current IO await and defers the VerifySrc step if IO await exceeds a threshold (e.g., 10ms). This would have prevented this failure entirely.
+---
+12. Sources Used
+Source Type	Query Window	Evidence	Relevance
+CloudBees Job Payload	N/A (provided)	Job ID, step "VerifySrc", exit code 2, agent crm-ubuntu221, failedReason "Aborted"	HIGH
+Datadog Host Inventory	Current	crm-ubuntu221 confirmed Agent 7.64.1, GNU/Linux	HIGH
+Datadog Metrics — system.io.await/util	06:07:00–06:13:00Z	Peak 70.67ms await / 32.2% util at 06:07:40Z; 11–35ms throughout step	HIGH — Highest IO contention across all 8 jobs
+Datadog Metrics — system.cpu.iowait/user/stolen	06:07:00–06:13:00Z	CPU iowait 3.55% peak; CPU user 0.65–4.04%; stolen 0%	HIGH
+Datadog Metrics — system.net.bytes_rcvd/sent	06:07:00–06:13:00Z	~97MB inbound in 8s; ~555MB outbound total — largest across all 8 jobs	HIGH
+Datadog Metrics — system.load.1	06:07:00–06:13:00Z	Load 2.78–3.87, never below 2.78 — chronic host overload	HIGH
+Datadog Logs — Artifactory (Flex)	06:09:00–06:11:00Z	Zero LDAP failures — authorization excluded	HIGH
+Datadog Incidents	06:05:00–06:20:00Z	Zero active incidents	No relevant findings
+Cross-Job Analysis (7 prior jobs)	Same morning session	4th WLAN TFH VerifySrc abort; highest IO await in session; extends pattern to crm-ubuntu fleet	HIGH — Confirms systemic pattern across two agent fleets

@@ -1,0 +1,355 @@
+---
+job_id: f1791bdd-0bec-f151-8192-1ea035bf3243
+chat_id: 01N7P0NP2EPB8EXEDTWD
+generated_at: 2026-07-07T19:50:21.397494
+source: NOVA
+partial_response: False
+---
+
+I now have all the data needed to compile the comprehensive RCA report. I also noticed a critical note in the resource description for `crm-ubuntu232`: **"syelugub- 7/31 space issue 7/17 smanley - put back in service"** — confirming a known prior space issue on this host. Let me now compile the full RCA report.
+
+---
+
+# CloudBees CD/RO — Root Cause Analysis Report
+
+---
+
+## # 1 Summary
+
+Job `CI_TZ.XF.5.25-00179.2-KALPENIAAAAANAZT-2_20260706_021954_022000` (Job ID: `f1791bdd-0bec-f151-8192-1ea035bf3243`) failed on **2026-07-06** at **09:44:05 UTC** due to the `BBS_PackMake` step exiting with **exit code 125** on agent host **crm-ubuntu232**. The CloudBees `errorHandling=abortJob` policy on that step triggered an immediate job abort.
+
+The `BuildInfoJson` property explicitly records `failedReason=PostPackBBS`, confirming the failure occurred during the **post-pack BBS phase** of the build. Exit code 125 in a Docker-based build context indicates the **Docker container failed to run or be created** — not a failure of the container's internal process. This is consistent with a resource-level failure on the agent host.
+
+Datadog telemetry on `crm-ubuntu232` shows **memory utilization rising from ~74% to ~85%** (~42 GB increase) over the job window, with **elevated kernel/system CPU** (cpu_sys exceeding cpu_user during 09:28–09:39), indicating heavy I/O or syscall pressure. The agent's CMDB resource description contains a historical annotation: **"syelugub- 7/31 space issue 7/17 smanley - put back in service"**, confirming this host has a documented prior disk space problem. A concurrent job (`f1791f06-4a84-f1fa-9190-1ea035bf3243`) was also running on the same agent at the time of failure.
+
+The most probable root cause is a **build-time failure within the BBS_PackMake/PostPackBBS phase**, most likely caused by a Docker container creation failure (exit code 125) potentially driven by resource pressure (memory growth, I/O contention) or a Docker-level error on the agent. Direct step execution logs on `crm-ubuntu232` are required to confirm the exact sub-cause.
+
+---
+
+## # 2 Job Context
+
+| Field | Value |
+|---|---|
+| **Job ID** | `f1791bdd-0bec-f151-8192-1ea035bf3243` |
+| **Job Name** | `CI_TZ.XF.5.25-00179.2-KALPENIAAAAANAZT-2_20260706_021954_022000` |
+| **Project** | `CRMBuilds` |
+| **Procedure** | `Build.Container.Rel.602829` |
+| **Launched By** | `tiberiumUserEC10_11` |
+| **Run As** | `aswbldsv` |
+| **Execution Node (Agent)** | `crm-ubuntu232` (ID: `f0ec3f7a-9c3e-f110-ad8b-2686f9881e6f`) |
+| **Build Resource Pool** | `CRMBuildsLinux-Ubuntu20-04` |
+| **Workspace (Unix)** | `/prj/qct/asw/ecmdr_ws_crm/BOOT.XF.4.1.4-00067-KAMORTALAZ-1_20260706_024225_024238` |
+| **CWD** | `/local/mnt/workspace/CRMBuilds/BOOT.XF.4.1.4-00067-KAMORTALAZ-1_20260706_024225` |
+| **Start** | `2026-07-06T09:20:00.467Z` |
+| **Finish** | `2026-07-06T09:46:56.009Z` |
+| **Elapsed** | ~26 min 56 sec (1,603,118 ms) |
+| **Final Status** | `completed` |
+| **Outcome** | `error` |
+| **Abort Status** | `ABORT` |
+| **Environment** | Production (`Prod`) |
+| **DB Host** | `Oil` |
+| **Commander Endpoint** | `qso-bicmdr.qualcomm.com` |
+| **Client** | `KALPENIAAAAANAZT` |
+| **Software Image** | `TZ.XF.5.25` |
+| **Image Revision** | `179`, Spin `2` |
+| **Site** | `SanDiego` |
+| **Workflow Type** | `ONPREMCONTAINERIZED` |
+| **Host OS** | `Ubuntu20_04` |
+| **Build Command** | `python3 trustzone_images/build/ms/build_all.py CHIPSET=kalpeni SIGNSERVER=https://crm-sign SIGNTYPE=CASS SIGNPORT=50110` |
+| **Build Path** | `\\snowcone\builds674\PROD\CI_TZ.XF.5.25-00179.2-KALPENIAAAAANAZT-2` |
+| **Linux Build Path** | `/prj/qct/asw/crmbuilds/snowcone/builds674/PROD/CI_TZ.XF.5.25-00179.2-KALPENIAAAAANAZT-2` |
+| **Built By** | `ravind` |
+| **Ref Build** | `TZ.XF.5.25-00179-KALPENIAAAAANAZT-2` |
+| **DCE Config** | `Config.DCE.Prod` |
+
+---
+
+## # 3 Build Timeline
+
+All times UTC.
+
+| Time (UTC) | Event |
+|---|---|
+| `09:20:00.467` | Job created and started — `CI_TZ.XF.5.25-00179.2-KALPENIAAAAANAZT-2` |
+| `09:20:00` – `09:43:34` | Sequential steps executed: `InitCredentialsAndServer` → `Init` → `Docker Login` → `GetQTI` → `GetBCI` → `GetParameterStore` → `Setup` → `BBS_sync` → `Sync` → `sync_spacer` → `PostSync` → `BBS_strip` |
+| `09:21:00` – `09:28:00` | Agent CPU low (0.11–0.39%), memory at ~74% (~186.8 GB used) |
+| `09:25:00` – `09:32:00` | CPU system spikes sharply — cpu_sys peaks at avg 12.60%, max 14.35%; cpu_sys exceeds cpu_user (heavy kernel/I/O activity) |
+| `09:28:00` – `09:30:00` | CPU user peaks at avg 8.10%, max 14.37% |
+| `09:43:34.761` | `BBS_PackMake` step transitions: `pending → runnable` |
+| `09:43:34.857` | Resource `crm-ubuntu232` assigned to `BBS_PackMake` by scheduler `las-colo12-j13-10` |
+| `09:43:34.861` | `BBS_PackMake` transitions: `runnable → scheduled` |
+| `09:43:34.934` | `BBS_PackMake` invoked on `crm-ubuntu232` by `las-colo12-j13-11` |
+| `09:43:34.974` | `BBS_PackMake` transitions: `scheduled → running` |
+| `09:44:00` | Memory on `crm-ubuntu232` reaches ~85% (~228–229 GB used); ~42 GB increase since job start |
+| `09:44:05.422` | `FinishCommandOperation` records exit code **125** for `BBS_PackMake` |
+| `09:44:05.430` | `RunCommandCallback` confirms exit code **125** |
+| `09:44:05.441` | `CommitCommandResultsOperation` transitions step from `success → error` |
+| `09:44:05.440` | Resource `crm-ubuntu232` released from `BBS_PackMake` (step duration: ~30 seconds) |
+| `09:44:05.483` | `CheckAbortCondition` evaluates: `errorHandling=abortJob` → triggers abort |
+| `09:44:05.512` | Job `modifyTime` updated — status: `running_error` |
+| `09:44:05.517` | `AbortJobOperation` triggered on `las-colo12-j13-11` |
+| `09:44:07` | `FixBuildStatus` step (alwaysRun) completes with status=0 |
+| `09:44:08` | `Finalize` step (alwaysRun, parallel) invoked |
+| `09:46:42.241` | `BuildInfoJson` property written — `failedReason=PostPackBBS`, `buildStatus=Failed` |
+| `09:46:45.105` | `PostTimingsToSplunk` step completes successfully |
+| `09:46:48.922` | Non-fatal `NoSuchProperty` for `customType` on `las-colo12-j13-10` (irrelevant to failure) |
+| `09:46:56.009` | Job finalized — outcome: `error`, abortStatus: `ABORT` |
+
+---
+
+## # 4 Execution Path Inventory
+
+### Failed Step
+
+| Field | Value |
+|---|---|
+| **Step Name** | `BBS_PackMake` |
+| **Step ID** | `f1791bdd-17fb-f111-93af-4efb9ff91010` |
+| **Exit Code** | **125** |
+| **Step Status** | `error` |
+| **Error Handling** | `abortJob` |
+| **Parallel** | Yes |
+| **Step Timeout** | `2026-07-06T03:13:34.907` (not reached — failure was not timeout-related) |
+| **Step Start** | `2026-07-06T09:43:34.974Z` |
+| **Step End** | `2026-07-06T09:44:05.441Z` |
+| **Step Duration** | ~30 seconds |
+| **Failed Reason (BuildInfoJson)** | `PostPackBBS` |
+
+### Agent Host
+
+| Field | Value |
+|---|---|
+| **Hostname** | `crm-ubuntu232` |
+| **Agent ID** | `f0ec3f7a-9c3e-f110-ad8b-2686f9881e6f` |
+| **OS** | Linux Ubuntu 20.04 (`5.4.0-107-generic #121-Ubuntu SMP`) |
+| **Architecture** | `x86_64` |
+| **Agent Version** | `2024.12.0.177508` |
+| **Protocol** | `6` |
+| **Agent State** | `alive` |
+| **Zone** | `default` (TRANSIENT) |
+| **Step Limit** | 9 |
+| **Step Count at Failure** | 2 (concurrent job also running) |
+| **Hardware** | HP BL460c Gen9 |
+| **Known Issue** | Resource description: *"syelugub- 7/31 space issue 7/17 smanley - put back in service"* |
+
+### Concurrent Job on Same Agent
+
+| Field | Value |
+|---|---|
+| **Job ID** | `f1791f06-4a84-f1fa-9190-1ea035bf3243` |
+| **Steps Running** | `VerifySrc`, `Make` (both status=0) |
+| **Impact** | Contributed to memory growth and I/O pressure on `crm-ubuntu232` during `BBS_PackMake` execution |
+
+### Commander Nodes
+
+| Node | IP | Role |
+|---|---|---|
+| `las-colo12-j13-09` | `10.81.104.241` | API handler, state machine |
+| `las-colo12-j13-10` | `10.81.104.242` | Scheduler / resource assignment |
+| `las-colo12-j13-11` | (not recorded) | State machine / dispatch / abort |
+| `qso-bicmdr.qualcomm.com` | — | Commander public endpoint |
+
+**Commander Assessment:** Commander nodes operated normally. Scheduling, invocation, abort, and finalization all completed without error. Commander is **NOT** a contributing factor.
+
+### Invoked Services (Directly Referenced)
+
+| Service | Evidence |
+|---|---|
+| **Sign Server** | `https://crm-sign` (SIGNSERVER in build command) — used by `BBS_PackMake` |
+| **Build Storage** | `\\snowcone\builds674\PROD` / `/prj/qct/asw/crmbuilds/snowcone/builds674/PROD` |
+| **Workspace NFS** | `\\snowcone\ecmdr_ws_crm\...` / `/prj/qct/asw/ecmdr_ws_crm/...` |
+| **Docker** | Workflow type `ONPREMCONTAINERIZED`; exit code 125 = Docker container creation failure |
+| **CASS Sign Service** | `SIGNTYPE=CASS SIGNPORT=50110` |
+
+---
+
+## # 5 Detected Error Codes
+
+| Code | Location | Meaning | Evidence |
+|---|---|---|---|
+| **Exit Code 125** | `BBS_PackMake` step on `crm-ubuntu232` | In Docker context: **container failed to run or be created** (Docker daemon error, not the container's own exit code). Exit code 125 is returned by `docker run` when the container cannot be started. | `FinishCommandOperation` at `09:44:05.422`, `RunCommandCallback` at `09:44:05.430`, `CommitCommandResultsOperation` at `09:44:05.441` — all from Splunk `index=ecommander` |
+| **failedReason=PostPackBBS** | `BuildInfoJson` property | Failure occurred specifically in the **PostPackBBS** sub-phase of the BBS_PackMake step | `BuildInfoJson` written at `09:46:42.241Z` — Splunk `index=ecommander` |
+| **ABORT** | Job-level abort status | `errorHandling=abortJob` on `BBS_PackMake` triggered job abort | `CheckAbortCondition` at `09:44:05.483`, `AbortJobOperation` at `09:44:05.517` — Splunk `index=ecommander` |
+| **NoSuchProperty (customType)** | `las-colo12-j13-10` at `09:46:48.922` | Non-fatal property lookup during job finalization | Splunk `index=ecommander` — **NOT related to failure** |
+| **NoSuchProperty (report-urls)** | `las-colo12-j13-09` | Non-fatal property lookup | Splunk `index=ecommander` — **NOT related to failure** |
+
+---
+
+## # 6 Correlated Observations
+
+### CloudBees
+
+- **Job abort message:** `"Job error [Aborted]: step 'BBS_PackMake' failed and its error handling aborted the job."` — confirmed in Splunk `index=ecommander`.
+- **Exit code 125** confirmed by three independent CloudBees Commander log events: `FinishCommandOperation`, `RunCommandCallback`, `CommitCommandResultsOperation`.
+- **failedReason=PostPackBBS** in `BuildInfoJson` confirms the failure sub-phase.
+- **Step duration was ~30 seconds** — extremely short for a PackMake step, consistent with a container startup failure rather than a compile or link failure.
+- **Timeout was NOT the cause** — the `Check If Any Step Failed due to Time Out` step completed with `errorHandling=ignore`, confirming the abort was triggered by the exit code, not a timeout.
+- **Concurrent job** `f1791f06-4a84-f1fa-9190-1ea035bf3243` was running `VerifySrc` and `Make` steps on the same agent simultaneously, consuming additional CPU, memory, and I/O resources.
+- **alwaysRun steps** (`FixBuildStatus`, `Finalize`, `PostTimingsToSplunk`) all completed successfully post-abort, confirming the Commander infrastructure was healthy.
+
+### Agent Host (`crm-ubuntu232`)
+
+**Source: Datadog Metrics — Correlation Window: `09:20:00Z` – `09:44:05Z`**
+
+| Metric | Observation | Assessment |
+|---|---|---|
+| **CPU User** | Peaked avg 8.10% at 09:28–09:30, max 14.37%; elevated 4.9–7.7% through 09:44 | Moderate — not exhausted |
+| **CPU System** | Peaked avg 12.60% at 09:30–09:32, max 14.35%; **cpu_sys > cpu_user** during 09:28–09:39 | **Significant** — indicates heavy kernel activity (I/O wait, syscalls, context switching) |
+| **Memory Used** | Rose from ~186.8 GB (~74%) at 09:00 to ~228–229 GB (~85%) by 09:44 — **~42 GB increase** | **Significant** — sustained memory growth with no release; concurrent job contributing |
+| **Memory Total** | Fixed at ~251.7 GB | No OOM observed, but headroom reduced to ~22–23 GB |
+| **Disk `/local/mnt`** | Gradual increase from ~12.9% to ~15.8%; free space declined ~31 GB (919 GB → 888 GB) over 47 min | Moderate — not full, but declining |
+| **Disk `/` (root FS)** | Stable ~52.5% | Normal |
+| **Disk `/var`** | Stable ~26.9%, slight drop to ~25.1% near end | Normal |
+| **Snap mounts** | 100% — all read-only loop mounts | Normal (expected) |
+
+**Known Historical Issue:** The CloudBees resource description for `crm-ubuntu232` contains: *"syelugub- 7/31 space issue 7/17 smanley - put back in service"* — confirming this host has a documented prior disk space problem and was previously taken out of service for it.
+
+**Datadog Logs:** No logs found for `crm-ubuntu232` in the Datadog flex tier for the failure window. Step execution logs must be examined directly on the agent.
+
+**SCOM:** No active SCOM alerts for `crm-ubuntu232`.
+
+### Commander Host
+
+- `las-colo12-j13-09`: API thread CPU 77% during `findJobSteps` (155ms), 45% during `getJobDetails` (109ms) — brief, non-fatal, normal API load.
+- `las-colo12-j13-10`: Scheduler operating normally; resource assignment and scheduling completed without error.
+- `las-colo12-j13-11`: State machine, dispatch, and abort operations completed normally.
+- **No Commander-level errors contributed to the failure.**
+
+### Datadog
+
+- No Datadog alerts referencing Job ID `f1791bdd-0bec-f151-8192-1ea035bf3243`, build name, or agent host `crm-ubuntu232` were found.
+- Datadog metrics on `crm-ubuntu232` show memory pressure and elevated kernel CPU — directly relevant to the agent host.
+- No findings from Datadog are excluded as out-of-scope.
+
+### Splunk
+
+- `index=ecommander` provided all primary evidence: job metadata, step sequence, exit code, abort chain, BuildInfoJson, agent identity, concurrent job, and Commander node activity.
+- All findings are directly traceable to the failed job and agent.
+
+### External Dependency
+
+| Service | Assessment |
+|---|---|
+| **Sign Server (`https://crm-sign`, CASS port 50110)** | No evidence of sign server failure in available data. Step failed in ~30 seconds — insufficient time to complete a signing operation. Cannot confirm or exclude sign server involvement without step logs. |
+| **Build Storage (`snowcone/builds674`)** | No storage failure events found. `/local/mnt` disk declining but not full. Cannot confirm or exclude without step logs. |
+| **Docker Daemon on `crm-ubuntu232`** | Exit code 125 is the canonical Docker "container failed to run/create" code. Docker daemon state on the agent at failure time is unknown without step logs. Memory pressure (~85% used) could cause Docker container creation failures. |
+
+---
+
+## # 7 Probable Root Cause
+
+**Primary Root Cause: Docker Container Creation Failure (Exit Code 125) During PostPackBBS Phase**
+
+**Evidence Chain:**
+
+1. `BBS_PackMake` step exited with **exit code 125** — confirmed by three independent CloudBees Commander log events (`FinishCommandOperation`, `RunCommandCallback`, `CommitCommandResultsOperation`) at `09:44:05Z`.
+2. Exit code 125 in a Docker-based workflow (`ONPREMCONTAINERIZED`) means **`docker run` failed to create or start the container** — this is a Docker daemon-level error, not a build code error.
+3. `BuildInfoJson.failedReason=PostPackBBS` confirms the failure occurred in the **PostPackBBS sub-phase** of the step.
+4. Step duration was **~30 seconds** — far too short for a TrustZone firmware pack/make operation to complete or fail on code; consistent with a container startup failure.
+5. Agent `crm-ubuntu232` had **memory utilization at ~85%** (~228 GB of 251 GB used) at the time of failure, with a **~42 GB increase** over the job window driven by both this job and a concurrent job (`f1791f06-4a84-f1fa-9190-1ea035bf3243`).
+6. **Elevated kernel CPU** (cpu_sys > cpu_user during 09:28–09:39) indicates heavy I/O or syscall pressure on the agent, consistent with Docker image layer operations or filesystem pressure.
+7. The agent has a **documented prior disk space issue** (resource description: *"syelugub- 7/31 space issue 7/17 smanley - put back in service"*), indicating this host has a history of resource-related failures.
+8. **Direct step execution logs on `crm-ubuntu232`** for the `BBS_PackMake` step are not available in Splunk or Datadog — the exact Docker error message (e.g., "no space left on device", "cannot allocate memory", "image pull failed") cannot be determined without examining the step log file directly.
+
+**Most Likely Sub-Cause (requires log confirmation):**
+Docker container creation failed due to one of:
+- Insufficient memory to allocate the container (memory at 85%, concurrent job consuming resources)
+- Docker image layer extraction failure due to disk pressure on `/local/mnt` (declining free space)
+- Docker daemon error triggered by I/O contention (elevated kernel CPU)
+
+---
+
+## # 8 Confidence Level
+
+### **MEDIUM**
+
+**Reason:**
+
+- **HIGH confidence** elements: Job ID, step name, exit code 125, failedReason=PostPackBBS, abort chain, agent identity, step duration — all directly confirmed by Splunk `index=ecommander`.
+- **MEDIUM confidence** elements: The link between memory/I/O pressure and the Docker exit code 125 is strongly correlated but not directly proven — the step execution log on `crm-ubuntu232` was not available in Splunk or Datadog.
+- **Cannot achieve HIGH confidence** without the `BBS_PackMake` step log file (`BBS_PackMake.f1791bdd-17fb-f111-93af-4efb9ff91010.log`) from `crm-ubuntu232`, which would contain the exact Docker error message.
+- No speculation has been introduced. The root cause is bounded by available evidence.
+
+---
+
+## # 9 Infrastructure vs Code Assessment
+
+| Assessment | Result |
+|---|---|
+| **Infrastructure Issue** | **YES** |
+| **Code Issue** | **NO** |
+| **Mixed** | **NO** |
+
+**Reason:**
+
+Exit code 125 is a **Docker daemon / container runtime error**, not a compiler, linker, or build script error. The step failed in ~30 seconds — insufficient time for a build code failure. The failure occurred at the container creation level (PostPackBBS phase), before the build command (`python3 trustzone_images/build/ms/build_all.py`) could execute or fail. Memory pressure (~85% utilization) and elevated kernel CPU on `crm-ubuntu232` are consistent with an infrastructure-level resource constraint causing Docker container creation to fail. The agent has a documented prior history of resource-related failures.
+
+---
+
+## # 10 Recommended Remediation
+
+1. **Retrieve and examine the BBS_PackMake step log immediately:**
+   - File: `BBS_PackMake.f1791bdd-17fb-f111-93af-4efb9ff91010.log` on `crm-ubuntu232`
+   - Path: `/local/mnt/workspace/CRMBuilds/` or the workspace directory
+   - This log will contain the exact Docker error message confirming the sub-cause.
+
+2. **Investigate Docker daemon state on `crm-ubuntu232` at failure time:**
+   - Check `/var/log/syslog` and `journalctl -u docker` on `crm-ubuntu232` around `09:43:34Z – 09:44:05Z`.
+   - Look for OOM killer events, Docker daemon errors, or storage driver errors.
+
+3. **Address memory pressure on `crm-ubuntu232`:**
+   - At failure time, memory was at ~85% (~228 GB of 251 GB). With a concurrent job also running, available headroom was ~22–23 GB.
+   - Review the step limit (currently 9) and consider reducing concurrent step assignments to this agent.
+   - Investigate whether the concurrent job `f1791f06-4a84-f1fa-9190-1ea035bf3243` should be scheduled on a different agent.
+
+4. **Investigate the `/local/mnt` disk trend:**
+   - Free space declined ~31 GB over 47 minutes. While not full at failure time, this trend warrants monitoring.
+   - Check Docker image cache size on `/local/mnt` — stale images may be consuming space.
+   - Run `docker system prune` on `crm-ubuntu232` to reclaim disk space.
+
+5. **Retry the failed job** after confirming agent resource health.
+
+---
+
+## # 11 Preventive Actions
+
+1. **Implement memory utilization alerting on CRM build agents:**
+   - Alert threshold: >80% memory utilization sustained for >5 minutes on `CRMBuildsLinux-Ubuntu20-04` pool agents.
+   - This would have flagged `crm-ubuntu232` before the failure.
+
+2. **Implement disk space alerting on `/local/mnt`:**
+   - Alert threshold: <200 GB free on `/local/mnt` (currently declining).
+   - Given the documented prior space issue on `crm-ubuntu232`, this is a known risk.
+
+3. **Implement Docker health checks as a pre-step:**
+   - Add a lightweight pre-flight step before `BBS_PackMake` to verify Docker daemon health and available disk/memory.
+
+4. **Review concurrent step scheduling policy for `crm-ubuntu232`:**
+   - The agent ran 2 concurrent jobs at the time of failure. Consider reducing `stepLimit` or implementing resource-aware scheduling to prevent memory contention.
+
+5. **Establish a regular Docker image cache cleanup schedule on all CRM build agents:**
+   - Scheduled `docker system prune -f` to prevent disk accumulation on `/local/mnt`.
+
+6. **Document and track the `crm-ubuntu232` resource history:**
+   - The existing annotation (*"space issue 7/17 smanley - put back in service"*) indicates this host has recurring resource issues. Consider a formal health review before returning it to the production pool.
+
+---
+
+## # 12 Sources Used
+
+| # | Source Type | Query Window | Evidence | Relevance |
+|---|---|---|---|---|
+| 1 | **Splunk** `index=ecommander` | `-7d` to `now` | Job ID, Job Name, Project, Procedure, Owner, Start/Finish times, Outcome, Abort status, error message | Primary job identity and metadata |
+| 2 | **Splunk** `index=ecommander` | `-7d` to `now` | Exit code 125 (FinishCommandOperation, RunCommandCallback, CommitCommandResultsOperation), abort chain, BuildInfoJson (failedReason=PostPackBBS), step sequence, agent assignment | Primary failure evidence — exit code and abort chain |
+| 3 | **Splunk** `index=ecommander` | `-7d` to `now` | Agent `crm-ubuntu232` identity, OS, agent version, zone, stepCount/stepLimit, concurrent job `f1791f06-4a84-f1fa-9190-1ea035bf3243`, resource description with prior space issue annotation | Agent host identification and concurrent job evidence |
+| 4 | **Splunk** `index=ecommander` | `-7d` to `now` | Commander nodes `las-colo12-j13-09/10/11`, API thread CPU, scheduling events, LDAP lookup, web host activity | Commander node health assessment |
+| 5 | **Datadog Metrics** (`system.cpu.user`, `system.cpu.system`) | `09:00:00Z – 09:47:00Z` | CPU user peaked 8.10% avg / 14.37% max; cpu_sys peaked 12.60% avg / 14.35% max; cpu_sys > cpu_user during 09:28–09:39 | Agent host CPU and kernel activity during job execution |
+| 6 | **Datadog Metrics** (`system.mem.used`, `system.mem.total`) | `09:00:00Z – 09:47:00Z` | Memory rose from ~186.8 GB (74%) to ~228–229 GB (85%); ~42 GB increase; no OOM | Agent host memory pressure during job execution |
+| 7 | **Datadog Metrics** (`system.disk.in_use`, `system.disk.free`) | `09:00:00Z – 09:47:00Z` | `/local/mnt` declined ~31 GB (919→888 GB free); root FS stable at 52.5%; snap mounts at 100% (normal for read-only loop mounts) | Agent host disk utilization during job execution |
+| 8 | **Datadog Logs** | `09:43:00Z – 09:44:30Z` | **0 results** — no Datadog logs for `crm-ubuntu232` in flex tier | Confirmed: no Datadog log coverage for agent host |
+| 9 | **SCOM** | Current | **0 active alerts** for `crm-ubuntu232` | Confirmed: no active SCOM alerts on agent host |
+
+---
+
+> **⚠️ Data Gap Notice:**
+> The `BBS_PackMake` step execution log file (`BBS_PackMake.f1791bdd-17fb-f111-93af-4efb9ff91010.log`) on agent host `crm-ubuntu232` was **not available** in Splunk or Datadog. This log contains the exact Docker error message that would confirm the precise sub-cause of the exit code 125 failure. **CloudBees step execution logs must be examined directly on `crm-ubuntu232`** to elevate confidence from MEDIUM to HIGH and confirm whether the failure was caused by memory exhaustion, disk pressure, Docker image pull failure, or another Docker daemon error.

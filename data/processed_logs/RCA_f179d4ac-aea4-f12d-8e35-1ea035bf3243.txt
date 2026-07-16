@@ -1,0 +1,138 @@
+Build ID: f179d4ac-aea4-f12d-8e35-1ea035bf3243
+---
+1. Executive Summary
+The CloudBees build Kaanapali.LA.1.2-00029-STD.INT-1 failed on 2026-07-07 due to a Compile Failure in the Make step. The Make step transitioned from outcome=success to outcome=error at 2026-07-07T00:25:11Z during commitCommandResults, triggering its errorHandling=abortJob policy. This cascaded an abort to all subsequent steps (VerifySrc and SaveBuild). No infrastructure-level failures were detected on the agent host or Commander nodes. The root cause is a code/compile-level failure in the build process for software image Kaanapali.LA.1.2 at branch revision 00029.
+
+---
+2. Job Context
+Field	Value
+Build ID	f179d4ac-aea4-f12d-8e35-1ea035bf3243
+Job Name	Kaanapali.LA.1.2-00029-STD.INT-1_20260707_002249_002256
+Project	CRMBuilds
+Procedure	Build.Rel.602829
+Software Image	Kaanapali.LA.1.2
+Branch Revision	00029
+Client	STD.INT
+Eng Label	GLUE.KAANAPALI_LA.1.2-00006-NOOP_TEST_KAANAPALI-1
+Launched By	tiberiumUserEC10_11
+Built By	dcheruku
+Build Server (Agent)	crm-ubuntu309 (Ubuntu 22.04, Drive G:, Site: SanDiego)
+Workflow	LEGACY
+Outcome	error
+Status	completed_error
+Abort Status	ABORT
+Failed Reason	Compile
+Build Location	\\snowcone\builds906\PROD / /prj/qct/asw/crmbuilds/snowcone/builds906/PROD/Kaanapali.LA.1.2-00029-STD.INT-1
+Build Delete Date	2026-07-10 ⚠️ (Artifacts at risk of deletion)
+---
+3. Build Timeline
+Time (UTC)	Event	Status
+2026-07-07T07:22:56Z	Job started — Procedure Build.Rel.602829 launched	✅ Started
+2026-07-07T07:22:57Z	Step Setup begins (exit code 0, duration 24s)	✅ Success
+2026-07-07T07:23:21Z	Step Setup completes successfully	✅ Success
+2026-07-07T00:24:31Z	Step Make timeout set (compositeDate 2026-07-09)	⏳ Running
+2026-07-07T00:24:35Z	Step VerifySrc — NoSuchProperty error for /myJob/SourceViolationRequired	⚠️ Warning
+2026-07-07T00:24:50Z	Resource crm-ubuntu309 last run time recorded (stepCount=5, stepLimit=9)	⏳ Running
+2026-07-07T00:25:11.793Z	Resource crm-ubuntu309 released from Make step — commitCommandResults	❌ Releasing
+2026-07-07T00:25:11.794Z	Make step transitions: outcome=success → outcome=error (CommitCommandResultsOperation)	❌ FAILED
+2026-07-07T00:25:11.818Z	Make step isReadyToComplete evaluated (0/0)	❌ Completing
+2026-07-07T00:25:11.819Z	Make step readyToComplete = true	❌ Completing
+2026-07-07T00:25:11.820Z	Make step transitions: status=running → completed with outcome=error	❌ Completed/Error
+2026-07-07T00:25:11.833Z	Resource usage record deleted — errorHandling=abortJob triggers job abort cascade	❌ Abort Triggered
+~2026-07-07T00:25:xx	Step VerifySrc aborted (code=ABORTED)	❌ Aborted
+~2026-07-07T00:26:xx	Step SaveBuild fails with outcome=error	❌ Failed
+2026-07-07T07:26:54Z	Job finishes — finishCommand on node las-colo12-j13-10	❌ completed_error
+---
+4. Execution Path Inventory
+Component	Role	Details
+Make	Primary Failed Step	Step ID: f179d4ac-ba8b-f18c-904e-2686f9881e6f, errorHandling=abortJob, parallel
+VerifySrc	Aborted Step	Aborted due to Make failure; also hit NoSuchProperty on /myJob/SourceViolationRequired
+SaveBuild	Aborted Step	Aborted due to Make failure; no valid artifacts to save
+Setup	Successful Step	Completed in 24s, exit code 0
+crm-ubuntu309	Agent Host	Ubuntu 22.04, SanDiego, Drive G:, stepCount=5, stepLimit=9, Resource ID: f0ec3f81-2adc-f1ad-aaf3-2686f9881e6f
+las-colo12-j13-09	Commander Node	Primary Commander processing Make step state machine transitions
+las-colo12-j13-10	Commander Node	Executed finishCommand at job end
+las-colo12-j13-11	Commander Node	Secondary Commander node (resource release activity)
+\\snowcone\builds906\PROD	Build Storage (Filer)	Build artifact storage location
+---
+5. Detected Error Codes & Evidence
+failedReason = Compile — Confirmed in BuildInfoJson metadata from Splunk
+outcome=error on Make step — Confirmed via CommitCommandResultsOperation log at 2026-07-07T00:25:11.794Z: "Updating jobStep[name=Make...outcome=success...] to outcome=error"
+errorHandling=abortJob — Confirmed on Make step; triggered full job abort cascade
+NoSuchProperty: /myJob/SourceViolationRequired — Detected in VerifySrc step at 2026-07-07T00:24:35Z; missing job property
+code=ABORTED on VerifySrc — Downstream abort from Make failure
+outcome=error on SaveBuild — Downstream failure; no valid artifacts from Make
+finish=0/0 on Make step — Indicates the Make step completed with 0 successful sub-tasks out of 0 expected (parallel execution anomaly)
+---
+6. Correlated Observations
+☁️ CloudBees
+Job contains 39 job steps total; only 3 failed (Make, VerifySrc, SaveBuild)
+Make step had parallel execution mode and errorHandling=abortJob
+The Make step's outcome flipped from success → error during commitCommandResults — this is the precise failure moment
+Steps Check If Any Step Failed due to TimeOut and Calculate metrics completed successfully — confirming no timeout was involved
+Multiple associated image builds exist across SanDiego and LasVegas sites
+🖥️ Agent Host — crm-ubuntu309
+At time of Make step failure: stepCount=5, stepLimit=9 — agent was NOT at capacity (5 of 9 slots used)
+Other jobs were concurrently running on crm-ubuntu309 (e.g., job f17a0f3d-cdee-f129-a8a8-2686f9881e6f with steps BBS_make and make_spacer at 07:23 UTC)
+No SCOM alerts detected for crm-ubuntu309 — no CPU, memory, or disk alerts
+No Datadog logs found for crm-ubuntu309 — agent has no Datadog telemetry coverage
+Agent resource was properly released after Make step failure — no agent hang or crash detected
+🏗️ Commander Nodes
+las-colo12-j13-09: Processed all Make step state machine transitions correctly — no Commander-level errors detected
+las-colo12-j13-10: Executed finishCommand successfully — Commander functioning normally
+las-colo12-j13-11: Secondary resource release activity — no anomalies
+Commander nodes processed the abort cascade correctly per configured errorHandling policy
+📊 Datadog
+No Datadog logs found for host crm-ubuntu309 in the failure window
+Agent host crm-ubuntu309 has no Datadog telemetry coverage — CPU, memory, disk, and network metrics cannot be assessed from Datadog
+🔍 Splunk
+Splunk (index=ecommander) provided full job metadata, step-level state machine transitions, and resource release logs
+Confirmed Make step failure at millisecond precision: 2026-07-07T00:25:11.794Z
+Confirmed concurrent jobs on crm-ubuntu309 were completing successfully — no systemic agent issue
+🔗 External Dependencies
+Build Storage (\\snowcone\builds906\PROD): Build location was set; no storage access errors detected in available logs
+No SCM, artifact repository, or package manager errors detected in available data
+---
+7. Probable Root Cause
+PRIMARY ROOT CAUSE: A Compile Failure occurred in the Make step during execution of build procedure Build.Rel.602829 for software image Kaanapali.LA.1.2 at branch revision 00029 on agent crm-ubuntu309.
+
+The Make step's outcome transitioned from success → error during commitCommandResults at 2026-07-07T00:25:11.794Z, confirmed by the CommitCommandResultsOperation log entry. The failedReason=Compile field in BuildInfoJson explicitly identifies this as a compile-level failure. The exact compile error (missing source file, syntax error, broken dependency, or toolchain issue) requires inspection of the Make step execution logs at /prj/qct/asw/crmbuilds/snowcone/builds906/PROD/Kaanapali.LA.1.2-00029-STD.INT-1.
+
+SECONDARY CONTRIBUTING FACTOR: The VerifySrc step encountered a NoSuchProperty error for /myJob/SourceViolationRequired at 2026-07-07T00:24:35Z. This missing job property suggests a misconfigured job template or a parameter that was not set during job launch. While this did not cause the primary failure, it indicates a configuration gap in the procedure definition.
+
+---
+8. Confidence Level
+MEDIUM-HIGH
+
+Reason: The failedReason=Compile field and the outcome=success → error transition in CommitCommandResultsOperation provide direct CloudBees metadata evidence of a compile failure. The Commander state machine logs confirm the exact failure timestamp and step identity. However, the specific compile error message (e.g., missing symbol, syntax error, broken header) is not available in Splunk or Datadog — it resides in the Make step execution logs on crm-ubuntu309. Confidence would be elevated to HIGH upon retrieval of those step logs.
+
+---
+9. Infrastructure vs Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue	NO	Agent stepCount=5/9 (not at capacity); no SCOM alerts; Commander nodes functioning normally; concurrent jobs on same agent succeeded
+Code Issue	YES	failedReason=Compile confirmed in BuildInfoJson; Make step outcome=error during commitCommandResults; compile failure is a source/build-level issue
+Mixed Issue	PARTIAL	Missing property /myJob/SourceViolationRequired in VerifySrc indicates a configuration/template issue alongside the compile failure
+---
+10. Recommended Remediation
+⚠️ URGENT — Preserve Build Artifacts: Build is scheduled for deletion on 2026-07-10. Immediately retrieve Make step execution logs from /prj/qct/asw/crmbuilds/snowcone/builds906/PROD/Kaanapali.LA.1.2-00029-STD.INT-1 before deletion.
+🔍 Inspect Make Step Logs: Review the compile output on crm-ubuntu309 (Drive G:) to identify the specific compile error — look for missing source files, broken includes, undefined symbols, or toolchain mismatches.
+👤 Review Recent Code Changes: Examine changes submitted by dcheruku and any other contributors to the Kaanapali.LA.1.2 branch at revision 00029 for breaking changes.
+🔧 Fix Missing Property: Investigate and resolve the missing job property /myJob/SourceViolationRequired in procedure Build.Rel.602829. Determine if it should be set as a launch parameter or defined in the procedure template.
+🏷️ Validate Eng Label Compatibility: Verify that eng label GLUE.KAANAPALI_LA.1.2-00006-NOOP_TEST_KAANAPALI-1 is compatible with branch revision 00029.
+🔁 Re-run Build: After fixing the compile issue and the missing property, re-trigger the build for Kaanapali.LA.1.2-00029-STD.INT-1.
+---
+11. Preventive Actions
+📋 Pre-build property validation: Add a pre-flight check step in procedure Build.Rel.602829 to validate required job properties (including SourceViolationRequired) before executing Make.
+📊 Datadog agent coverage: Deploy Datadog agent on crm-ubuntu309 to enable CPU, memory, disk, and network telemetry for future RCA investigations.
+🔔 Compile failure alerting: Configure CloudBees or Splunk alerts to notify on failedReason=Compile events for critical image builds.
+🗂️ Extended log retention: Increase build artifact retention beyond 3 days for failed builds to allow adequate post-mortem investigation time.
+🧪 Pre-submit validation: Enforce pre-submit compile checks on the Kaanapali.LA.1.2 branch to catch compile errors before they reach the integration build.
+---
+12. Sources Used
+Source	Query Window	Evidence	Relevance
+Splunk (index=ecommander)	-7d to now	Job metadata, step outcomes, state machine transitions, resource release logs, Commander node activity	PRIMARY — Full job execution path evidence
+Splunk (index=ecommander) — Make step detail	-7d to now	CommitCommandResultsOperation log confirming outcome=success→error at 00:25:11.794Z; resource release at 00:25:11.793Z	PRIMARY — Exact failure moment evidence
+Splunk (index=ecommander) — Agent concurrency	-7d to now	stepCount=5, stepLimit=9; concurrent jobs (BBS_make, make_spacer) on crm-ubuntu309 succeeded	SUPPORTING — Rules out agent resource exhaustion
+Datadog Logs	2026-07-07T07:00Z–08:00Z	0 results for host:crm-ubuntu309	No telemetry coverage on agent host
+SCOM Alerts	Current active alerts	0 active alerts for crm-ubuntu309	No infrastructure alerts on agent host
+---

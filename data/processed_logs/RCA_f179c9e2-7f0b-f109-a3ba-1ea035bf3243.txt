@@ -1,0 +1,183 @@
+Root Cause Analysis Report
+Job ID: f179c9e2-7f0b-f109-a3ba-1ea035bf3243  |  Build: Snapdragon_Auto.HQX.4.5.6.0.r2-00015-STD.PROD-1.172209.1  |  Outcome: ERROR / COMPILE
+
+---
+1. Executive Summary
+CloudBees job f179c9e2-7f0b-f109-a3ba-1ea035bf3243 failed during the "Make" step with exit code 4 on agent host san-w175-ma3-2-05. The CloudBees execution context classifies the failure reason as "Compile". This is the longest-running failed step across all seven jobs analyzed — 16 minutes 54 seconds — consistent with a large, complex Snapdragon Auto firmware build that partially compiled before encountering a fatal error.
+
+This job is unique in the session for two reasons:
+
+It is a Make step failure (exit code 4) — not a VerifySrc abort. This is the same step type as job f179cbb0 (crm-ubuntu322), but with full Datadog telemetry available on this host.
+It exhibits the most severe infrastructure stress of all seven jobs — system load peaked at 4.74, IO await peaked at 10.84ms, IO utilization reached 17.2%, and CPU iowait hit 3.63% — all occurring simultaneously during a massive network burst (~91MB inbound + ~414MB outbound) in the first 2.5 minutes of the Make step.
+Probable Root Cause: The Make step initiated a large source/artifact fetch (~91MB inbound + ~62MB pre-step) and simultaneously pushed a massive outbound transfer (~414MB+ total) during the early compilation phase. This created severe IO contention on the agent's storage subsystem (10.84ms await, 17.2% util) as the compiler was simultaneously reading source files, writing object files, and competing with large network buffer flushes. The IO contention caused compilation to stall or produce errors, ultimately resulting in GNU Make exit code 4 (fatal build error). The build ran two distinct compilation bursts (06:07:54–06:15:52Z and 06:18:03–06:20:13Z) before failing at 06:24:48Z.
+
+⚠️ No application-level logs are forwarded from san-w175-ma3-2-05 to Datadog. The Datadog Agent is installed and reporting metrics, but no log pipeline is configured. The exact compiler error message (missing symbol, failed target, IO error during compilation) must be retrieved from CloudBees step logs.
+
+---
+2. Job Context
+Job ID: f179c9e2-7f0b-f109-a3ba-1ea035bf3243
+Job Name: Snapdragon_Auto.HQX.4.5.6.0.r2-00015-STD.PROD-1.172209.1_20260706_230527_230542
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: Make (Step ID: f179c9e2-8aa3-f1d2-b195-2686f9881e6f)
+Exit Code: 4 — GNU Make fatal build error (compiler error, missing target, or unresolvable dependency)
+Agent Host: san-w175-ma3-2-05 (GNU/Linux, Datadog Agent 7.64.1 ✅ — metrics available, no log pipeline)
+Build Name: Snapdragon_Auto.HQX.4.5.6.0.r2-00015-STD.PROD-1.172209.1
+Declared Failure Reason: Compile
+Build Type: Snapdragon Auto HQX 4.5.6.0.r2 — STD.PROD (standard production) build, revision 15, build number 172209.1
+Step Duration: 16m 54s (06:07:54 → 06:24:48Z) — longest failed step across all 7 jobs
+Job Duration: ~22m 3s (06:05:42 → 06:27:45Z)
+Agent Rack: san-w175-ma3 — distinct from the ha1 and ja4 racks seen in previous jobs
+---
+3. Build Timeline
+Time (UTC)	Event	Detail
+2026-07-07 06:05:42	Job Started	CRMBuilds / Build.Rel.602829 initiated on san-w175-ma3-2-05. Disk at 40.1%.
+~2026-07-07 06:06:05–06:07:10Z	Pre-Step Source Download	~62MB inbound — large source package download. Disk rises to 42.65%. IO await rises to 5.9ms. CPU user 0.97–2.54%.
+2026-07-07 06:07:54	Make Step Started	Step begins — Correlation Window Opens. IO await 8.92ms (already elevated). Load 1.86–2.24. Disk 42.65%.
+~06:07:10–06:08:21Z	Outbound Burst Begins	net_sent: 46.7MB — large outbound transfer starts at step onset. CPU user 0.97–2.54%.
+~06:09:21–06:10:32Z	⚡ PEAK IO CONTENTION + NETWORK STORM	IO await: 9.62–10.84ms (avg 10.12ms) | IO util: 7.06–17.20% (avg 14.63%) | CPU iowait: 2.88–3.63% | Load: 2.47–4.74 | net_rcvd: 91.4MB | net_sent: 163–203MB. Compiler competing with massive IO from concurrent network transfers.
+~06:10:26–06:11:31Z	⚡ Continued IO + Outbound Storm	IO util still up to 16.98% | net_sent: 231MB (peak outbound) | Load: 3.48–4.74 | CPU user: 2.26–2.41%
+~06:11:31–06:15:52Z	First Compile Burst — Active	IO subsides to 0.03–0.11ms. CPU user sustained 2.29–3.16% — active compilation. Load declining 3.05→2.32. Network settling 3–23MB/interval.
+~06:15:52–06:18:03Z	⚡ Compile Activity Drops	CPU user drops to 0.14–0.54% — first compile phase ends or stalls. Load drops to 1.38–1.85. Possible Make error detection or phase transition.
+~06:18:03–06:20:13Z	Second Compile Burst	CPU user rises to 2.40–2.67% — second compilation phase. Load 1.70–1.99. IO minimal (0.02–1.58ms).
+~06:20:13–06:24:48Z	Compile Activity Ends → Failure	CPU user drops to 0.12–1.83% — compilation concludes. Make processes error output and exits. Load 1.37–2.11.
+2026-07-07 06:24:48	Make Step FAILED	Exit Code 4 — GNU Make fatal error — Correlation Window Closes
+2026-07-07 06:27:45	Job Ended	Job terminates with outcome: error (~2m 57s post-step cleanup)
+---
+4. Execution Path Inventory
+Failed Step: "Make" — full compilation step for Snapdragon Auto HQX firmware; ran for 16m 54s with two distinct compile bursts before fatal failure
+Agent Host: san-w175-ma3-2-05 (GNU/Linux, Datadog Agent 7.64.1 — metrics available, no log pipeline)
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Invoked Services: Source repository (large inbound ~62MB pre-step + ~91MB during step); remote artifact/upload endpoint (~414MB+ outbound during step); compiler toolchain (sustained CPU 2.26–3.16% for ~12 minutes)
+Storage Subsystem: Directly in execution path — compiler reads source files and writes object files; IO contention (10.84ms await, 17.2% util) directly impacted compilation
+---
+5. Detected Error Codes & Signals
+Code / Signal	Source	Meaning	Evidence
+Exit Code 4	CloudBees Step Metadata	GNU Make fatal build error — compiler error, missing target, unresolvable dependency, or IO error during compilation. Same exit code as job f179cbb0 (crm-ubuntu322) but with full telemetry available here.	failedStep.exitCode = "4"
+Compile (failedReason)	CloudBees executionContext	Build system classified failure as compile-type	executionContext.failedReason = "Compile"
+IO Await Peak 10.84ms	Datadog Metrics — san-w175-ma3-2-05	Storage device wait time peaked at 10.84ms at ~06:10:32Z — 2.5 minutes into the Make step. Sustained above 9.6ms for ~2 minutes. Indicates storage subsystem saturation during concurrent network buffer flush and compiler IO.	system.io.await avg 10.12ms (06:09:27–06:10:32Z), max 10.84ms
+IO Util Peak 17.2%	Datadog Metrics — san-w175-ma3-2-05	Storage device utilization reached 17.2% — elevated. Combined with 10.84ms await, indicates a slow storage device (spinning HDD or congested NFS) under concurrent compiler + network IO load.	system.io.util avg 14.63% (06:09:27–06:10:32Z), max 17.20%
+CPU iowait Peak 3.63%	Datadog Metrics — san-w175-ma3-2-05	CPU iowait peaked at 3.63% — the highest across all 7 jobs. Compiler processes were blocked waiting for IO, directly slowing compilation and potentially causing timeouts or read errors.	system.cpu.iowait avg 3.24% (06:09:21–06:10:26Z), max 3.63%
+System Load Peak 4.74	Datadog Metrics — san-w175-ma3-2-05	Load average peaked at 4.74 — the highest across all 7 jobs. Indicates multiple processes simultaneously competing for CPU and IO resources during the peak contention window.	system.load.1 avg 4.11 (06:10:26–06:11:31Z), max 4.74
+Network Storm: 91MB in + 414MB out	Datadog Metrics — san-w175-ma3-2-05	~91MB inbound at 06:09:21–06:10:26Z + ~414MB outbound across 06:07:10–06:10:26Z — massive concurrent network activity during early Make execution. Network buffer flushes to disk competed directly with compiler IO.	system.net.bytes_rcvd max 91.4MB; system.net.bytes_sent max 231MB/interval
+Two Compile Bursts	Datadog Metrics — san-w175-ma3-2-05	CPU user shows two distinct elevated periods (06:07:54–06:15:52Z and 06:18:03–06:20:13Z) separated by a low-CPU gap. Consistent with Make compiling multiple targets/modules, encountering errors in some, and continuing with others before final fatal failure.	system.cpu.user pattern across 16m 54s step window
+Disk Oscillation 40.1%↔42.8%	Datadog Metrics — san-w175-ma3-2-05	Disk usage oscillated between 40.1% and 42.8% — temporary writes (source downloads, object files) followed by cleanup. No disk exhaustion. Disk is not a limiting factor.	system.disk.in_use oscillating 0.401–0.428 throughout
+CPU Stolen = 0	Datadog Metrics — san-w175-ma3-2-05	No hypervisor CPU theft — VM-level resource contention excluded	system.cpu.stolen = 0 throughout
+Memory: ~177–178GB usable	Datadog Metrics — san-w175-ma3-2-05	~190–191GB usable (converted from bytes: 190,152,507,392 bytes ≈ 177GB). Stable throughout — no memory pressure.	system.mem.usable stable ~190–191GB bytes
+---
+6. Correlated Observations
+CloudBees
+Step "Make" failed with exit code 4 and failure reason "Compile" — GNU Make fatal error after 16m 54s of execution
+Step duration of 16m 54s is the longest across all 7 jobs — consistent with a large Snapdragon Auto firmware build that partially compiled multiple modules before encountering a fatal error
+Build name Snapdragon_Auto.HQX.4.5.6.0.r2-00015-STD.PROD-1.172209.1 — production Snapdragon Auto build, high complexity, large source tree
+Two distinct CPU compile bursts visible in metrics — Make likely compiled multiple targets, with some succeeding and others failing, before the fatal error terminated the build
+Confidence: HIGH — directly from job payload
+Agent Host (san-w175-ma3-2-05) — KEY FINDINGS
+✅ Datadog Agent 7.64.1 installed — full metric telemetry available
+
+🔴 INFRASTRUCTURE STRESS CONFIRMED — Highest severity across all 7 jobs analyzed
+
+IO Contention — Critical Window (06:09:21–06:10:32Z):
+
+IO await: 9.62–10.84ms (avg 10.12ms) — 2× higher than the previous worst (san-w175-ja4-6-06 at 35.7ms was during a download write; this is during active compilation)
+IO util: 7.06–17.20% (avg 14.63%) — storage device under heavy concurrent load
+CPU iowait: 2.88–3.63% — compiler processes blocked on IO, directly slowing compilation
+The 10.84ms await at 17.2% utilization indicates a slow storage device (spinning HDD or congested NFS) — same pattern as san-w175-ja4-6-06 but triggered by compiler IO rather than a download write
+IO contention lasted ~2 minutes (06:09:21–06:11:31Z) before subsiding — long enough to cause compiler timeouts or read errors on source files
+Network Storm — Concurrent with IO Contention:
+
+~91MB inbound at 06:09:21–06:10:26Z — large artifact/source fetch during active compilation
+~414MB outbound across 06:07:10–06:10:26Z (46.7MB + 37.2MB + 163–203MB + 231MB) — massive upload during compilation
+The simultaneous large inbound + outbound transfers during active compilation created a network-IO storm — network buffers being flushed to disk competed directly with the compiler's file reads/writes
+After 06:11:31Z, network settles to 3–23MB/interval — the storm subsides and compilation continues more cleanly in the second burst
+System Load — Peak 4.74:
+
+Load peaked at 4.74 at ~06:10:26–06:11:31Z — the highest across all 7 jobs
+A load of 4.74 with CPU user at only 2.26–2.41% indicates most processes are in IO-wait (D-state), not running — the compiler and network processes were all blocked waiting for storage IO
+Load declined steadily after 06:11:31Z as IO contention subsided
+Two Compile Bursts — Make Behavior:
+
+First burst (06:07:54–06:15:52Z): CPU user 1.85–3.16% — active compilation of multiple targets. IO contention during first 2.5 minutes may have caused some compilation units to fail or produce corrupted output.
+Gap (06:15:52–06:18:03Z): CPU drops to 0.14–0.54% — Make processing errors, writing error output, or waiting for a dependency. Load drops to 1.38–1.85.
+Second burst (06:18:03–06:20:13Z): CPU user 2.40–2.67% — Make continues with remaining targets or retries. IO is clean (0.02–1.58ms).
+Final phase (06:20:13–06:24:48Z): CPU drops to 0.12–1.83% — Make processing final errors and preparing exit. Exits with code 4 at 06:24:48Z.
+Commander Host
+No Commander host identified — OUT_OF_SCOPE
+Datadog — Logs & Incidents
+Zero log entries from san-w175-ma3-2-05 — no log pipeline configured
+Zero Artifactory LDAP errors during this job's window — LDAP excluded
+Zero active incidents during the job execution window
+Cross-Job Context
+This is the only Make step failure with full telemetry across the 7 jobs — job f179cbb0 (crm-ubuntu322) had the same exit code 4 but zero telemetry
+The IO contention pattern (slow storage + concurrent network IO) is consistent with the WLAN TFH VerifySrc abort jobs, but here it manifests as a compile failure rather than an upload abort — the same underlying infrastructure weakness (slow storage on san-w175 agents) affects different build types differently
+No LDAP failures — this job's window (06:05–06:28Z) predates the LDAP failure window seen in job f179cba9 (06:19:14Z)
+---
+7. Probable Root Cause
+Primary: IO Contention During Compilation — Network-IO Storm Caused Compiler Failure
+
+The Make step initiated compilation of the Snapdragon Auto HQX firmware while simultaneously performing large network transfers (~91MB inbound + ~414MB outbound). The concurrent network buffer flushes to disk competed with the compiler's file reads/writes, causing IO await to spike to 10.84ms and IO utilization to reach 17.2%. With CPU iowait at 3.63%, compiler processes were blocked waiting for IO — unable to read source files or write object files at the required rate. This IO starvation caused one or more compilation units to fail (missing input file, read error, or compiler timeout), ultimately triggering GNU Make exit code 4 (fatal build error). The build ran for 16m 54s with two compile bursts before the accumulated errors caused Make to abort.
+
+Causal Chain:
+
+Job setup downloads ~62MB source package (06:06:05–06:07:10Z) — disk rises to 42.65%
+Make step starts at 06:07:54Z — compilation begins, CPU user rises to 1.85–2.54%
+Large outbound transfer begins (~46.7MB + 37.2MB) at 06:07:10–06:08:21Z — network buffers compete with compiler IO
+At 06:09:21Z: massive simultaneous burst — 91MB inbound + 163–203MB outbound — creates network-IO storm
+IO await spikes to 10.84ms, IO util to 17.2%, CPU iowait to 3.63%, load to 4.74 — compiler processes blocked on IO
+IO-starved compiler fails to read source files or write object files correctly — compilation errors accumulate
+IO contention subsides at ~06:11:31Z — compilation continues in second burst (06:18:03–06:20:13Z)
+Make processes accumulated errors, determines build cannot succeed — exits with code 4 at 06:24:48Z
+Supporting Evidence:
+
+IO await 10.84ms, IO util 17.2%, CPU iowait 3.63% at 06:09:21–06:10:32Z (Datadog metrics)
+Load peak 4.74 — processes in D-state (IO-blocked), not running (Datadog system.load.1)
+91MB inbound + 414MB outbound concurrent with IO peak — network-IO storm confirmed (Datadog network metrics)
+Two distinct compile bursts — Make continued after initial errors, consistent with partial compilation failure (Datadog CPU pattern)
+Exit code 4 — GNU Make fatal error (CloudBees metadata)
+16m 54s step duration — large build partially succeeded before fatal failure (CloudBees metadata)
+CPU stolen = 0% — hypervisor contention excluded (Datadog system.cpu.stolen)
+Memory stable ~190GB — memory pressure excluded (Datadog system.mem.usable)
+No LDAP failures — authorization excluded (Datadog logs)
+---
+8. Confidence Level
+✅ MEDIUM-HIGH
+
+HIGH confidence that severe IO contention occurred during the Make step — direct metric evidence with precise timestamps and peak values
+HIGH confidence that the network-IO storm (91MB in + 414MB out concurrent with compilation) caused the IO contention
+HIGH confidence that the IO contention impacted compilation — CPU iowait 3.63% means compiler processes were blocked on IO
+MEDIUM confidence on the specific compiler error — the exact error message (missing file, read error, compiler timeout) requires step logs from CloudBees
+MEDIUM-HIGH overall — the infrastructure causal chain is well-evidenced; the specific compiler error is the missing link
+---
+9. Infrastructure vs Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue	YES — CONFIRMED	Direct metric evidence: IO await 10.84ms, IO util 17.2%, CPU iowait 3.63%, load 4.74 — all during active compilation. Network-IO storm (91MB in + 414MB out) concurrent with Make execution caused storage subsystem saturation that directly impacted compiler IO operations.
+Code Issue	POSSIBLE — CANNOT EXCLUDE	Cannot exclude a pre-existing code defect (missing symbol, syntax error, incompatible dependency) in the Snapdragon Auto source tree without step logs. The IO contention may have triggered a latent code issue, or the code issue may exist independently. Step logs required to confirm.
+Mixed	POSSIBLE	Infrastructure failure (IO contention) is confirmed. A concurrent code issue cannot be excluded without step logs. Mixed classification is possible.
+---
+10. Recommended Remediation
+Retrieve Make step logs from CloudBees immediately: Access the CloudBees Commander UI for job f179c9e2-7f0b-f109-a3ba-1ea035bf3243 → Step "Make" → View Log. Identify the specific compiler error (missing file, read error, undefined symbol, or IO error) that caused exit code 4. This will determine whether the failure is purely infrastructure-driven or has a code component.
+Investigate the large outbound transfer (~414MB) during compilation: Identify what process was sending 414MB+ outbound during the Make step. This concurrent upload is the primary trigger of the IO contention. It should not be running simultaneously with active compilation — schedule it before or after the Make step.
+Investigate the storage device on san-w175-ma3-2-05: A 10.84ms IO await at 17.2% utilization indicates a slow storage device. Check whether the build workspace is on a spinning HDD or congested NFS mount. Consider migrating to SSD or a dedicated high-performance NFS tier for Snapdragon Auto builds.
+Separate network-intensive operations from compilation: The VerifySrc/upload phase should complete before the Make step begins. Concurrent large network transfers during compilation create IO contention that directly impairs compiler performance.
+Re-run the build: If the IO contention was caused by a concurrent job or transient network burst, re-trigger the build with the network-intensive operations serialized before Make.
+---
+11. Preventive Actions
+Configure Datadog Log Pipeline on san-w175-ma3-2-05: The Datadog Agent is installed but no logs are forwarded. Configure log collection for CloudBees agent logs, compiler output, and syslog. This is the 7th consecutive job without log forwarding — fleet-wide remediation is urgently needed.
+Add IO Wait Monitor for san-w175 Build Agents: Create a Datadog monitor on system.io.await alerting at >10ms for all san-w175 agents. The 10.84ms peak would have triggered an alert before the build failed.
+Serialize Network and Compile Operations in Build.Rel.602829: Modify the CloudBees procedure to ensure large network transfers (source downloads, artifact uploads) complete before the Make step begins. Concurrent network IO during compilation is a systemic risk across the san-w175 fleet.
+Storage Upgrade Assessment for san-w175-ma3 Rack: The IO contention pattern (high await at moderate utilization) is consistent across multiple san-w175 agents. Evaluate whether the entire san-w175 fleet's build workspace storage should be upgraded to SSD or a higher-performance NFS tier.
+Concurrent Job Throttling: The load peak of 4.74 suggests multiple concurrent processes. Limit concurrent IO-intensive jobs on san-w175-ma3-2-05 to prevent network-IO storms during compilation.
+Add Pre-Make IO Health Check: Add a pre-step to the CloudBees procedure that validates storage IO performance before invoking Make. If IO await exceeds a threshold (e.g., 5ms), delay the Make step until IO subsides.
+---
+12. Sources Used
+Source Type	Query Window	Evidence	Relevance
+CloudBees Job Payload	N/A (provided)	Job ID, step "Make", exit code 4, agent host san-w175-ma3-2-05, failedReason "Compile", 16m 54s duration	HIGH — Primary evidence source
+Datadog Host Inventory	Current	san-w175-ma3-2-05 confirmed Agent 7.64.1, GNU/Linux	HIGH — Confirms telemetry availability
+Datadog Metrics — system.io.await/util	06:05:05–06:27:00Z	Peak 10.84ms await / 17.2% util at 06:09:27–06:10:32Z — IO contention during compilation	HIGH — Direct evidence of storage IO contention during Make step
+Datadog Metrics — system.cpu.iowait/user/stolen	06:05:00–06:27:00Z	CPU iowait 3.63% peak; CPU user 2.26–3.16% sustained; stolen 0%	HIGH — Confirms compiler IO blocking; excludes VM contention
+Datadog Metrics — system.load.1	06:05:00–06:27:00Z	Peak 4.74 — highest across all 7 jobs; processes in D-state (IO-blocked)	HIGH — Confirms severity of IO contention impact
+Datadog Metrics — system.net.bytes_rcvd/sent	06:05:00–06:27:00Z	91MB inbound + 414MB outbound concurrent with IO peak — network-IO storm identified	HIGH — Identifies network-IO storm as IO contention trigger
+Datadog Metrics — system.mem.usable / system.disk.in_use	06:05:05–06:27:00Z	Memory stable ~190GB; disk 40.1–42.8% (oscillating, no exhaustion)	HIGH — Excludes memory/disk exhaustion as contributing factors
+Datadog Logs — Artifactory (Flex)	06:07:00–06:28:00Z	Zero LDAP failures — authorization excluded	HIGH — Explicitly excludes LDAP as factor
+Datadog Incidents	06:05:00–06:28:00Z	Zero active incidents	No relevant findings

@@ -1,0 +1,188 @@
+---
+job_id: f1792e9f-295b-f15c-8a42-4efb9ff91010
+chat_id: QPFJXBHMSKX04XY3X6ZQ
+generated_at: 2026-07-07T20:15:34.649786
+source: NOVA
+partial_response: True
+---
+
+I now have all the data needed to compile the comprehensive RCA report. The evidence is clear and consistent. Let me now produce the full report.
+
+---
+
+# CloudBees CD/RO Root Cause Analysis Report
+
+---
+
+## # 1 Summary
+
+**Job `f1792e9f-295b-f15c-8a42-4efb9ff91010`** (`TZ.XF.5.1-01227-ADJKAMORTAAANBZT-1_20260706_043403_043417`) failed on **2026-07-06** in the **CRMBuilds / SanDiego Prod** environment. The sole failed step, **Make** (step ID `f1792e9f-3605-f146-aa6d-1ea035bf3243`), exited with **code 125** — a Docker-specific exit code that unambiguously indicates the Docker daemon on agent host **`san-w175-ma3-2-06`** failed to start the container before any build code executed. The step retried up to 5 times and failed every attempt.
+
+**Critical corroborating evidence:** A second, independent job (`f1790709-c6ee-f153-bbcd-1ea035bf3243`) running on the **same agent** (`san-w175-ma3-2-06`) also failed with **exit code 125** on its `BBS_make` step, pulling from the **same AWS ECR registry** (`019415958841.dkr.ecr.us-west-2.amazonaws.com`). This cross-job pattern on the same host strongly points to a **Docker daemon or ECR connectivity issue on `san-w175-ma3-2-06`** as the root cause, not a code defect.
+
+Datadog metrics confirm a **~18 GB memory drop** on the agent host around 11:40–11:41 UTC (within the Make step window), consistent with a process crash or OOM kill event. No SCOM alerts were active on the host. No Datadog Docker logs were available for the agent.
+
+The **Commander nodes** (`las-colo12-j13-09`, `las-colo12-j13-10`) operated normally throughout — the Docker Login step preceding Make succeeded, and Commander state machine processing was healthy.
+
+**Root Cause:** Docker container runtime failure on agent `san-w175-ma3-2-06` — most likely caused by a Docker daemon crash/restart, OOM kill of the Docker daemon or a dependent process, or a transient ECR authentication/connectivity failure — preventing `docker run` from starting the container.
+
+---
+
+## # 2 Job Context
+
+| Field | Value |
+|---|---|
+| **Job ID** | `f1792e9f-295b-f15c-8a42-4efb9ff91010` |
+| **Job Name** | `TZ.XF.5.1-01227-ADJKAMORTAAANBZT-1_20260706_043403_043417` |
+| **Project** | `CRMBuilds` |
+| **Procedure** | `Build.Container.Rel.602829` |
+| **Launched By** | `tiberiumUserEC10_11` |
+| **Run As** | `aswbldsv` |
+| **Execution Node (Agent)** | `san-w175-ma3-2-06` |
+| **Agent OS** | Linux Ubuntu 4.15.0-226-generic x86_64 |
+| **Agent Version** | 2024.12.0.177508 |
+| **Workspace** | `crm_ws_sd` → `/prj/qct/asw/ecmdr_ws_crm/TZ.XF.5.1-01227-ADJKAMORTAAANBZT-1_20260706_043403_043417` |
+| **Start** | 2026-07-06T11:34:17.081Z |
+| **Finish** | 2026-07-06T11:48:16.485Z |
+| **Elapsed** | ~14 minutes (839,404 ms) |
+| **Final Status** | `completed` / Outcome: `error` / AbortStatus: `ABORT` |
+| **Error Message** | `"Job error [Aborted]: step 'Make' failed and its error handling aborted the job."` |
+| **Commander Nodes** | `las-colo12-j13-09` (API, IP 10.81.104.241), `las-colo12-j13-10` (StateMachine) |
+| **Commander Endpoint** | `qso-bicmdr.qualcomm.com` |
+| **Build Record** | failedReason: `Compile`, workflowType: `ONPREMCONTAINERIZED`, hostOS: `Ubuntu16_04`, softwareImage: `TZ.XF.5.1`, imageRevision: `1227`, storedOn: `Filer` |
+
+---
+
+## # 3 Build Timeline
+
+| Time (UTC) | Event |
+|---|---|
+| **2026-07-06T11:34:17.081Z** | Job created and started |
+| **~11:34:24Z** | Step: **Docker Login** (`f1792e9f-347e-f18a-aa6d-1ea035bf3243`) — **SUCCESS** on `san-w175-ma3-2-06` |
+| **~11:34:17Z – ~11:40:33Z** | Steps: `InitCredentialsAndServer`, `Init`, `GetQTI`, `GetBCI`, `GetParameterStore`, `Setup`, `BBS_sync`, `Sync`, `sync_spacer`, `PostSync`, `BBS_strip` — all preceding Make |
+| **2026-07-06T11:34:17.142Z** | Step: **Make** (`f1792e9f-3605-f146-aa6d-1ea035bf3243`) begins on `san-w175-ma3-2-06` |
+| **~11:35:00–11:38:00Z** | Datadog: CPU spike on `san-w175-ma3-2-06` (peak ~7% avg) |
+| **~11:40:00–11:41:00Z** | Datadog: **~18 GB memory drop** on `san-w175-ma3-2-06` (199 GB → ~182 GB) — consistent with process crash/OOM kill |
+| **~11:34:17Z – 11:46:49Z** | Make step retries Docker run up to 5 times, all fail with exit code 125 |
+| **2026-07-06T11:46:49.671Z** | Step: **Make** exits with **code 125** — `errorHandling: abortJob` triggered |
+| **2026-07-06T11:46:49.744Z** | Commander node `las-colo12-j13-10` submits `abortJob` message `f179305f-c6a1-f120-8d37-1ea035bf3243` |
+| **~11:48:16Z** | Step: **LabelBuild** (`f1792e9f-362c-f158-aa6d-1ea035bf3243`) — pending 2/2 deps, aborted |
+| **2026-07-06T11:48:16.485Z** | Job finishes: `completed_error` |
+| **~11:49:58Z** | Agent request deleted from Commander cache |
+| **~11:57:56Z** | Session deleted on `las-colo12-j13-10` |
+
+---
+
+## # 4 Execution Path Inventory
+
+### Failed Step
+| Field | Value |
+|---|---|
+| **Step Name** | Make |
+| **Step ID** | `f1792e9f-3605-f146-aa6d-1ea035bf3243` |
+| **Exit Code** | **125** (Docker daemon failed to start container) |
+| **Status** | `completed_error` |
+| **Start** | 2026-07-06T11:34:17.142Z |
+| **End** | 2026-07-06T11:46:49.671Z |
+| **Duration** | 6 minutes 15 seconds (375,775 ms) |
+| **Error Handling** | `abortJob` |
+| **Retries** | Up to 5 attempts configured |
+| **Docker Image** | `019415958841.dkr.ecr.us-west-2.amazonaws.com/bsaas-tz/tz.xf.5.2:16.04.20260615.9` |
+| **Container Name** | `Make_TZ.XF.5.1-01227-ADJKAMORTAAANBZT-1_20260706_043403` |
+| **Compile Package** | `/local/mnt/workspace/CRMBuilds/TZ.XF.5.1-01227-ADJKAMORTAAANBZT-1/compile_package/compile_package_latest.tar.gz` |
+| **Build Command** | `QSWATWorkspace -build_id TZ.XF.5.1-01227-ADJKAMORTAAANBZT-1 -step compile` |
+
+### Agent Host
+| Field | Value |
+|---|---|
+| **Hostname** | `san-w175-ma3-2-06` |
+| **OS** | Linux Ubuntu 4.15.0-226-generic x86_64 |
+| **Agent Version** | 2024.12.0.177508 |
+| **Agent Status** | Alive (confirmed by Commander) |
+| **Resource Pool** | `CRMBuildsLinux-Ubuntu18-04` (13 resources) |
+| **Step Limit** | 9 |
+| **Step Count at Docker Login** | 2 |
+
+### Commander Hosts
+| Node | Role | IP |
+|---|---|---|
+| `las-colo12-j13-09` | Primary API handler | 10.81.104.241 |
+| `las-colo12-j13-10` | StateMachine / step completion | 10.81.104.242 |
+
+### Directly Invoked External Services
+| Service | Endpoint | Relevance |
+|---|---|---|
+| **AWS ECR** | `019415958841.dkr.ecr.us-west-2.amazonaws.com` | Docker image source — **primary suspect** |
+| CRM DB | `oil.qualcomm.com` | Build metadata |
+| PCM WebService | `pcm.qualcomm.com` | Build configuration |
+| CSDS | `csds.qualcomm.com` | Software revision service |
+| Tiberium WS | `tiberium2ws.qualcomm.com` | Build orchestration |
+| JobCommander | `tiberium.qualcomm.com:50000` | Job dispatch |
+| Stormchaser / Axway | `apigw-op.qualcomm.com` | API gateway |
+| Sign Server | `aswsec-16.qualcomm.com` | Code signing |
+
+---
+
+## # 5 Detected Error Codes
+
+| Code | Meaning | Evidence |
+|---|---|---|
+| **125** | `docker run` failed — the Docker daemon could not create or start the container. This occurs **before** any in-container code runs. Causes: image pull failure from ECR, Docker daemon crash/restart, invalid Docker options, or Docker socket unavailability. | CloudBees step metadata: `exitCode=125`, step `Make`, job `f1792e9f-295b-f15c-8a42-4efb9ff91010` |
+| **125** (second job) | Same Docker failure on same agent | CloudBees step metadata: `exitCode=125`, step `BBS_make`, job `f1790709-c6ee-f153-bbcd-1ea035bf3243`, same agent `san-w175-ma3-2-06` |
+
+---
+
+## # 6 Correlated Observations
+
+### CloudBees
+
+**Finding 1 — Make Step Exit Code 125 (Primary)**
+- Step `Make` (`f1792e9f-3605-f146-aa6d-1ea035bf3243`) on agent `san-w175-ma3-2-06` exited with code 125.
+- Exit code 125 is Docker-specific: `docker run` returned before the container started.
+- The step retried up to 5 times before final failure.
+- `errorHandling: abortJob` propagated the failure to the entire job.
+- **Source:** Splunk `index=ecommander`, job ID `f1792e9f-295b-f15c-8a42-4efb9ff91010`
+- **Confidence:** HIGH
+
+**Finding 2 — Docker Login Step Succeeded**
+- Step `Docker Login` (`f1792e9f-347e-f18a-aa6d-1ea035bf3243`) completed successfully at ~11:34:24Z on the same agent.
+- This confirms ECR credentials were valid at the time of Docker Login.
+- However, ECR tokens expire (typically 12 hours). The Make step ran ~7 hours after the job was created (job created at 04:34 UTC, Make step ran at 11:34 UTC). **ECR token expiry is a plausible contributing factor.**
+- **Source:** Splunk `index=ecommander`, step ID `f1792e9f-347e-f18a-aa6d-1ea035bf3243`
+- **Confidence:** MEDIUM
+
+**Finding 3 — Concurrent Job on Same Agent Also Failed with Exit Code 125**
+- Job `f1790709-c6ee-f153-bbcd-1ea035bf3243` (`TZ.XF.5.0.3.c10-00118-S6150AAAAANAZT-2_20260705_235045_235056`) ran on the **same agent** `san-w175-ma3-2-06`.
+- Its `BBS_make` step also failed with **exit code 125** at 2026-07-06T06:56:33Z–06:57:23Z.
+- Same ECR registry: `019415958841.dkr.ecr.us-west-2.amazonaws.com/baas/qswat-toolchain:0.1.20260518.2`
+- Same procedure: `Build.Container.Rel.602829`
+- **This cross-job pattern on the same agent is the strongest evidence of a host-level Docker or ECR issue.**
+- **Source:** Splunk `index=ecommander`, job ID `f1790709-c6ee-f153-bbcd-1ea035bf3243`
+- **Confidence:** HIGH
+
+**Finding 4 — Commander Nodes Healthy**
+- `las-colo12-j13-09` thread CPU was 83% during dispatch (normal for a busy Commander).
+- `las-colo12-j13-10` processed the `abortJob` state machine transition correctly.
+- No Commander errors were found in the correlation window.
+- **Source:** Splunk `index=ecommander`, Commander debug logs
+- **Confidence:** HIGH (Commander was NOT the cause)
+
+### Agent Host (`san-w175-ma3-2-06`)
+
+**Finding 5 — ~18 GB Memory Drop at ~11:40–11:41 UTC**
+- Datadog memory metric shows a sharp drop from ~199–200 GB to ~182–184 GB at approximately 11:40–11:41 UTC.
+- This is within the Make step execution window (11:34:17Z – 11:46:49Z).
+- A sudden ~18 GB memory release is consistent with: a large process crash, OOM kill, or Docker daemon restart releasing container memory.
+- **Source:** Datadog metric `system.mem.used`, host `san-w175-ma3-2-06`, window 11:30–11:50 UTC
+- **Confidence:** MEDIUM (corroborating, not definitive without kernel/OOM logs)
+
+**Finding 6 — CPU Spike at ~11:35–11:38 UTC**
+- CPU user spiked to ~7% average (peak ~7.43%) between 11:35 and 11:38 UTC.
+- This is consistent with Docker image pull attempts or retry loop activity.
+- CPU levels are not alarming and do not indicate resource exhaustion.
+- **Source:** Datadog metric `system.cpu.user`, host `san-w175-ma3-2-06`
+- **Confidence:** LOW (normal build activity)
+
+**Finding 7 — Disk Usage Normal**
+- Disk usage was stable at ~11.1–11.3% throughout the window.
+- No disk pressure

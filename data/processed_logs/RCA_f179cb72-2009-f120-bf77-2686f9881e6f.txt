@@ -1,0 +1,184 @@
+Root Cause Analysis Report
+Job ID: f179cb72-2009-f120-bf77-2686f9881e6f  |  Build: WLAN.TFH.3.6.c2-00721-QCATFSWPZ-2  |  Outcome: ERROR / ABORTED
+
+---
+1. Executive Summary
+CloudBees job f179cb72-2009-f120-bf77-2686f9881e6f failed during the "VerifySrc" step with exit code 2 on agent host san-w175-ha1-4-07. The CloudBees execution context classifies the failure reason as "Aborted" — the step was externally terminated before natural completion.
+
+This job shares the same step name (VerifySrc), exit code (2), failure reason (Aborted), and procedure (Build.Rel.602829) as the previous job on san-w175-ja4-6-06, but the infrastructure signature is distinctly different:
+
+No large inbound network burst — unlike the previous job's 257MB download, this host received only ~1.2–1.4MB/s during the step. The source fetch pattern is absent.
+Massive outbound network burst — 55MB → 40MB → 54MB → 107MB → 98MB sent during the step window (~354MB total outbound in ~77 seconds). This is the dominant infrastructure signal.
+IO contention pre-step — IO await peaked at 15.97ms and IO util at 15.97% at ~06:19:23Z, 27 seconds before the step started. This indicates the storage subsystem was already under load from a prior or concurrent operation when VerifySrc began.
+Rising system load — load average climbed steadily from 0.81 → 1.97 throughout the window, indicating accumulating process pressure, consistent with concurrent workloads on the agent.
+CPU abrupt drop to 0.07% at the end of the step — consistent with process termination (abort signal).
+Probable Root Cause: The VerifySrc step was aborted due to a combination of pre-existing IO contention (storage subsystem already stressed before step start) and a large outbound data transfer (~354MB) that saturated the agent's upload bandwidth or triggered a network/transfer timeout. The step likely attempted to upload or push source verification artifacts/results to a remote endpoint. The transfer stalled or exceeded a timeout threshold, triggering an abort. Exit code 2 and "Aborted" classification confirm external termination.
+
+⚠️ No application-level logs are forwarded from san-w175-ha1-4-07 to Datadog. The Datadog Agent is installed and reporting metrics, but no log pipeline is configured. Step-level stdout/stderr must be retrieved directly from CloudBees to confirm the exact abort trigger and the destination of the outbound transfer.
+
+---
+2. Job Context
+Job ID: f179cb72-2009-f120-bf77-2686f9881e6f
+Job Name: WLAN.TFH.3.6.c2-00721-QCATFSWPZ-2_20260706_231638_231652
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: VerifySrc (Step ID: f179cb72-2ade-f1e2-b856-2686f9881e6f)
+Exit Code: 2 — script-level abort / explicit exit 2 on detected error condition
+Agent Host: san-w175-ha1-4-07 (GNU/Linux, Datadog Agent 7.64.1 ✅)
+Build Name: WLAN.TFH.3.6.c2-00721-QCATFSWPZ-2
+Declared Failure Reason: Aborted
+Build Type: WLAN TFH 3.6.c2 (Thin Firmware Host, older branch) — QCATFSWPZ variant
+Agent Rack: san-w175-ha1 — 20 hosts registered in Datadog, all Agent 7.64.1 GNU/Linux
+---
+3. Build Timeline
+Time (UTC)	Event	Detail
+2026-07-07 06:16:52	Job Started	CRMBuilds / Build.Rel.602829 initiated on san-w175-ha1-4-07
+~2026-07-07 06:19:14–06:19:32	⚡ Pre-Step IO Contention	IO await peaks at 15.97ms, IO util at 15.97%, CPU iowait spikes to 0.129% — storage subsystem under load before VerifySrc starts. Concurrent workload suspected.
+~2026-07-07 06:19:11	Large Outbound Transfer Begins	Network bytes_sent: 9.4MB → drops → then massive burst begins. System load starts rising from 0.81.
+2026-07-07 06:19:50	VerifySrc Step Started	Step begins — Correlation Window Opens. IO contention already present. Load at ~1.03.
+~2026-07-07 06:19:59–06:20:44	⚡ Massive Outbound Burst During Step	bytes_sent: 55MB → 40MB → 54MB → 107MB → 98MB in successive intervals. Total ~354MB outbound. System load rises to 1.97. CPU user peaks at 1.27%.
+~2026-07-07 06:20:53–06:21:07	CPU Drops Abruptly	CPU user falls from ~1.02% to 0.07% — process terminated. Load begins declining from 1.97 → 1.55.
+2026-07-07 06:21:07	VerifySrc Step ABORTED	Exit Code 2 — step terminated — Correlation Window Closes (duration: ~1m 17s)
+2026-07-07 06:25:54	Job Ended	Job terminates with outcome: error (4m 47s after step abort — cleanup/teardown phase)
+---
+4. Execution Path Inventory
+Failed Step: "VerifySrc" — source verification step; on this host, dominated by a large outbound transfer (~354MB sent), suggesting upload of source verification data or artifacts to a remote endpoint
+Agent Host: san-w175-ha1-4-07 (GNU/Linux, Datadog Agent 7.64.1 — metrics available, no log pipeline)
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Invoked Services: Remote endpoint receiving the large outbound transfer (Artifactory, SCM, or build coordination server — specific endpoint not available from metadata); local storage subsystem on san-w175-ha1-4-07
+Concurrent Workloads: Rising system load (0.81 → 1.97) and pre-step IO contention strongly suggest at least one other concurrent process running on this agent during the step
+---
+5. Detected Error Codes & Signals
+Code / Signal	Source	Meaning	Evidence
+Exit Code 2	CloudBees Step Metadata	Script-level abort — explicit exit 2 on detected error, or return code from a failed transfer utility (e.g., rsync protocol error, scp failure, curl partial transfer). Identical to previous job's exit code.	failedStep.exitCode = "2"
+Aborted	CloudBees executionContext	Step terminated before natural completion — timeout, external signal, or explicit abort in script	executionContext.failedReason = "Aborted"
+IO Await 15.97ms (pre-step)	Datadog Metrics — san-w175-ha1-4-07	Storage device wait time peaked at 15.97ms at ~06:19:23Z — 27 seconds before step start. Indicates a concurrent workload was already stressing the storage subsystem when VerifySrc began.	system.io.await peak at point 3 (~06:19:23Z), 9s interval series
+IO Util 15.97% (pre-step)	Datadog Metrics — san-w175-ha1-4-07	Storage utilization at 15.97% before step start — elevated baseline entering the step	system.io.util peak at point 3 (~06:19:23Z)
+Outbound Burst ~354MB	Datadog Metrics — san-w175-ha1-4-07	55MB + 40MB + 54MB + 107MB + 98MB sent in successive ~9s intervals during the step. Total ~354MB outbound in ~45 seconds. Dominant infrastructure signal — no equivalent inbound burst.	system.net.bytes_sent peaks during step window
+Rising System Load 0.81→1.97	Datadog Metrics — san-w175-ha1-4-07	Load average rose steadily throughout the window — consistent with accumulating concurrent processes, many in IO-wait or runnable state	system.load.1 rising from 0.81 → 1.97 across 24 data points
+CPU Abrupt Drop to 0.07%	Datadog Metrics — san-w175-ha1-4-07	CPU user dropped from ~1.02% to 0.07% at end of step — process terminated (abort signal or script exit)	system.cpu.user sharp decline at final data points
+CPU Stolen = 0	Datadog Metrics — san-w175-ha1-4-07	No hypervisor CPU theft — VM-level resource contention is NOT a contributing factor	system.cpu.stolen = 0 throughout
+---
+6. Correlated Observations
+CloudBees
+Step "VerifySrc" failed with exit code 2 and failure reason "Aborted" — identical signature to the previous WLAN TFH job on san-w175-ja4-6-06
+Step duration: ~1m 17s — slightly longer than the previous job's ~1m 5s, consistent with a larger or slower transfer before abort
+Job total duration: ~9m 2s — significantly longer than the step duration, indicating substantial pre-step and post-step activity (setup, cleanup, teardown)
+Build type WLAN.TFH.3.6.c2 — older WLAN TFH branch; QCATFSWPZ variant
+Confidence: HIGH — directly from job payload
+Agent Host (san-w175-ha1-4-07) — KEY FINDINGS
+✅ Datadog Agent 7.64.1 installed — full metric telemetry available
+
+IO Subsystem — Pre-Step Contention:
+
+IO await peaked at 15.97ms at ~06:19:23Z — 27 seconds before VerifySrc started. This is a pre-existing IO load, not caused by the VerifySrc step itself.
+IO util peaked at 15.97% simultaneously — elevated but not fully saturated
+CPU iowait spiked to 0.129% at the same point — processes were blocked on IO before the step began
+IO metrics settled to 0.05–3.79% during the step itself — the pre-step IO burst subsided, but the storage device was already in a degraded state entering the step
+Contrast with previous job (san-w175-ja4-6-06): That job had IO contention during the step (35.7ms peak) caused by a large inbound download. This job had IO contention before the step from a concurrent workload, with the step itself dominated by outbound traffic.
+Network — Dominant Outbound Transfer:
+
+~354MB sent during the step window in 5 successive bursts: 55MB → 40MB → 54MB → 107MB → 98MB
+Only ~1.2–1.5MB received during the step — no large source download. This is the opposite pattern from the previous job.
+The outbound burst pattern suggests the VerifySrc step was uploading source verification data, build artifacts, or a source tree to a remote endpoint (Artifactory, build server, or SCM)
+The transfer was interrupted mid-stream (CPU drops abruptly while outbound traffic was still active) — consistent with a timeout or abort signal during upload
+System Load — Concurrent Workload Evidence:
+
+Load average rose from 0.81 → 1.97 across the entire window — a steady, sustained increase
+This pattern is characteristic of multiple concurrent processes accumulating on the agent, not a single step's activity
+CPU user remained low (0.1–1.27%) while load was high — consistent with processes in IO-wait or runnable-but-blocked state
+Memory: 392–393GB usable — no memory pressure whatsoever
+Disk: 42.1% used — healthy, no disk exhaustion
+CPU stolen: 0% — no hypervisor contention
+Comparison with Previous Job (san-w175-ja4-6-06):
+
+Signal	san-w175-ja4-6-06 (prev job)	san-w175-ha1-4-07 (this job)
+IO await peak	35.7ms (during step)	15.97ms (pre-step)
+Network inbound	257MB received (large download)	~1.4MB (minimal)
+Network outbound	144MB sent (post-step)	~354MB sent (during step)
+System load peak	2.04	1.97
+Primary failure mode	IO contention during download write	Upload timeout/abort during outbound transfer
+Exit code	2	2
+Failure reason	Aborted	Aborted
+Commander Host
+No Commander host identified in job metadata
+No Commander-related errors found in logs during the correlation window
+OUT_OF_SCOPE
+Datadog — Logs
+Zero log entries from san-w175-ha1-4-07 — Datadog Agent installed but no log pipeline configured
+Zero Artifactory LDAP errors during this job's window — LDAP is NOT a contributing factor
+Zero active incidents during the job execution window
+No monitors configured for san-w175-ha1-4-07
+External Dependencies — SCOPE VALIDATION
+Artifactory LDAP failures — Zero occurrences during this job's window. OUT_OF_SCOPE
+Remote upload endpoint — The destination of the ~354MB outbound transfer is unknown from available metadata. This endpoint (Artifactory, SCM, or build server) is in the execution path but cannot be identified without step logs.
+---
+7. Probable Root Cause
+Primary: Large Outbound Transfer Timeout/Abort During VerifySrc Upload Phase
+
+The VerifySrc step initiated a large outbound transfer (~354MB) to a remote endpoint. The agent's storage subsystem was already under IO contention from a concurrent workload (IO await 15.97ms pre-step). The combination of pre-existing IO pressure and a sustained large upload (~354MB in ~45 seconds) caused the transfer to stall or exceed a timeout threshold. The VerifySrc script detected the failure condition and exited with code 2. CloudBees classified this as "Aborted."
+
+Causal Chain:
+
+A concurrent workload on san-w175-ha1-4-07 creates IO contention (15.97ms await) before VerifySrc starts
+VerifySrc step starts at 06:19:50Z with the storage subsystem already stressed
+Step initiates a large outbound transfer (~354MB) — likely uploading source verification data or artifacts to a remote endpoint
+The upload proceeds but encounters a stall — possibly due to network congestion, remote endpoint slowness, or local IO contention affecting read throughput for the upload
+Transfer exceeds a timeout threshold OR the remote endpoint rejects/drops the connection
+VerifySrc script detects failure → exits with code 2
+CloudBees marks step as failed with reason "Aborted"
+Supporting Evidence:
+
+IO await 15.97ms at ~06:19:23Z — pre-step IO contention from concurrent workload (Datadog system.io.await)
+~354MB outbound burst during step window (Datadog system.net.bytes_sent)
+Only ~1.4MB inbound — no large download, upload is the dominant operation (Datadog system.net.bytes_rcvd)
+System load rising 0.81 → 1.97 — concurrent process accumulation (Datadog system.load.1)
+CPU abrupt drop to 0.07% — process terminated (Datadog system.cpu.user)
+Exit code 2 + failedReason "Aborted" — external termination confirmed (CloudBees metadata)
+CPU stolen = 0% — hypervisor contention excluded (Datadog system.cpu.stolen)
+Memory 392GB usable, disk 42.1% — resource exhaustion excluded
+---
+8. Confidence Level
+✅ MEDIUM
+
+HIGH confidence that the step was aborted — exit code 2 + "Aborted" + abrupt CPU drop are unambiguous
+HIGH confidence that a large outbound transfer (~354MB) occurred during the step — direct metric evidence
+HIGH confidence that pre-step IO contention existed from a concurrent workload
+MEDIUM confidence on the specific abort trigger — the destination of the outbound transfer and the exact error (timeout, connection reset, remote rejection) cannot be determined without step logs
+MEDIUM overall — the causal chain is well-supported by metrics but the final link (what specifically caused the abort) requires step log confirmation
+---
+9. Infrastructure vs Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue	YES — LIKELY	Pre-step IO contention from concurrent workload, large outbound transfer stall/timeout, and rising system load are all infrastructure-layer signals. The abort was triggered by an infrastructure condition (network/IO), not a code defect.
+Code Issue	NO — UNLIKELY	No compiler errors, no syntax errors. "Aborted" classification and exit code 2 indicate external termination. The WLAN source tree itself is not implicated.
+Mixed	POSSIBLE	Cannot exclude a remote endpoint issue (Artifactory, SCM server) contributing to the upload failure. The remote endpoint is in the execution path but has no telemetry available.
+---
+10. Recommended Remediation
+Retrieve VerifySrc step logs from CloudBees: Access the CloudBees Commander UI for job f179cb72-2009-f120-bf77-2686f9881e6f → Step "VerifySrc" → View Log. Identify the destination of the ~354MB outbound transfer and the exact error message (timeout, connection reset, upload failure).
+Identify the concurrent workload causing pre-step IO contention: Check CloudBees agent configuration for san-w175-ha1-4-07 to determine how many concurrent jobs were running at 06:19:14–06:19:32Z. The IO await spike before the step started indicates another job was performing IO-intensive operations simultaneously.
+Investigate the upload endpoint: Once the destination of the outbound transfer is identified from step logs, check the health and availability of that endpoint at 06:19:50–06:21:07Z. A slow or overloaded upload target would explain the transfer stall.
+Check network bandwidth on san-w175-ha1-4-07: A ~354MB upload in ~45 seconds (~63 Mbps) is substantial. Verify whether the agent's network interface was saturated or whether the upload was competing with other network traffic from concurrent jobs.
+Re-run the build: If the IO contention and upload stall were transient, re-trigger the build. Monitor IO and network metrics during the re-run.
+---
+11. Preventive Actions
+Configure Datadog Log Pipeline on san-w175-ha1-4-07: The Datadog Agent is installed but no logs are forwarded. Configure log collection for CloudBees agent logs and syslog. All 20 san-w175-ha1 hosts appear to lack log pipelines — this should be a fleet-wide remediation.
+Add IO Wait and Network Saturation Monitors: Create Datadog monitors on system.io.await (alert >20ms) and system.net.bytes_sent (alert on sustained high outbound) for all san-w175 build agents. Pre-step IO contention would have been detectable before the build failure.
+Concurrent Job Throttling: The rising load average (0.81 → 1.97) and pre-step IO contention indicate concurrent jobs competing for storage resources. Implement IO-aware job scheduling — limit concurrent IO-intensive steps on the same agent.
+Upload Retry Logic in VerifySrc: Implement retry logic with exponential backoff for the outbound transfer in the VerifySrc script. A single transient network stall should not abort the entire build.
+Increase Upload Timeout: If the abort is triggered by a fixed timeout, consider increasing the timeout for large WLAN source tree uploads, or implement chunked transfer with progress monitoring.
+Cross-Job Pattern Analysis: This is the second consecutive WLAN TFH VerifySrc abort (exit code 2, "Aborted") across two different agents (san-w175-ja4-6-06 and san-w175-ha1-4-07). Investigate whether the VerifySrc script has a systemic timeout or transfer issue affecting all WLAN TFH builds, or whether the remote upload endpoint is consistently slow/overloaded during this time window.
+Standardize Agent Log Forwarding: Audit all san-w175 build agents (both ha1 and ja4 racks) for Datadog log pipeline configuration. Consistent log forwarding across the fleet is essential for rapid RCA.
+---
+12. Sources Used
+Source Type	Query Window	Evidence	Relevance
+CloudBees Job Payload	N/A (provided)	Job ID, step "VerifySrc", exit code 2, agent host san-w175-ha1-4-07, failedReason "Aborted"	HIGH — Primary evidence source
+Datadog Host Inventory	Current	san-w175-ha1-4-07 confirmed with Agent 7.64.1, GNU/Linux. 20 san-w175-ha1 hosts all registered.	HIGH — Confirms telemetry availability
+Datadog Metrics — system.io.await/util	06:19:05–06:21:50Z	Peak 15.97ms await / 15.97% util at ~06:19:23Z (pre-step); settled during step	HIGH — Pre-step IO contention from concurrent workload
+Datadog Metrics — system.net.bytes_sent	06:19:11–06:21:15Z	~354MB outbound in 5 successive bursts during step window	HIGH — Dominant infrastructure signal; identifies upload as primary operation
+Datadog Metrics — system.net.bytes_rcvd	06:19:11–06:21:15Z	Only ~1.2–1.5MB received during step — no large download	HIGH — Excludes download as primary operation; confirms upload pattern
+Datadog Metrics — system.load.1 / cpu.*	06:19:11–06:21:15Z	Load 0.81→1.97 (concurrent workloads); CPU drop to 0.07% (abort); stolen=0 (no VM contention)	HIGH — Confirms abort pattern and concurrent workload pressure
+Datadog Logs (Flex)	06:16:52–06:26:00Z	Zero log entries — no log pipeline on san-w175-ha1-4-07	Confirms log coverage gap
+Datadog Logs — Artifactory (Flex)	06:19:00–06:22:00Z	Zero LDAP sync failures — LDAP not a factor for this job	Explicitly excludes LDAP as contributing factor
+Datadog Incidents	06:16:52–06:26:00Z	Zero active incidents	No relevant findings
+Prior Job RCA (san-w175-ja4-6-06)	Same time window	Same exit code 2, same "Aborted" reason, same VerifySrc step — cross-job pattern identified	MEDIUM — Pattern correlation; suggests systemic VerifySrc issue across WLAN TFH builds

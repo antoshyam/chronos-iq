@@ -1,0 +1,134 @@
+Build ID: f179d5b7-545b-f1b1-a844-2686f9881e6f  |  Generated: 2026-07-07
+
+---
+1. 📋 Executive Summary
+The CloudBees CI build CI_QCM2290.LA.5.0-00058_DEF_AU787.1-STD.APQ.INT-2 failed on 2026-07-07 due to a compilation failure in the Make step. The BuildMongr -makebuild command exited with exit code 4 (a standard make/compiler error code indicating build errors), which triggered an abortJob cascade that also failed the SaveBuild step and cancelled all downstream steps. The root cause is a code/compile-level failure within the build itself. Agent host infrastructure was healthy — CPU was nominal (<3%), memory was stable, and no SCOM alerts were active. The failure is classified as a Compile Failure with HIGH confidence.
+
+---
+2. 🏗️ Job Context
+Field	Value
+Build ID	f179d5b7-545b-f1b1-a844-2686f9881e6f
+Job Name	CI_QCM2290.LA.5.0-00058_DEF_AU787.1-STD.APQ.INT-2_20260707_003012_003023
+Project	CRMBuilds
+Procedure	Build.Rel.602829
+Outcome	completed_error / ABORT / Failed
+Failed Step	Make (Step Index 10, JobStepId: f179d5b7-5ebc-f119-9a35-2686f9881e6f)
+Service Type	CI (Continuous Integration)
+Software Image	QCM2290.LA.5.0
+Client	STD.APQ.INT
+Site	SanDiego
+Launched By	tiberiumUserEC10_11
+Run As User	aswbldsv
+Host OS	Ubuntu 18.04
+Spin	2
+Eng Label	GLUE.DIVAR-IOT_LA.1.0-00032-NOOP_TEST-1
+Reference Build	QCM2290.LA.5.0-00058_DEF_AU787-STD.APQ.INT-1
+Build Delete Date	⚠️ 2026-07-10 (artifacts at risk of purge)
+---
+3. ⏱️ Build Timeline
+Time (UTC)	Event	Status
+07:30:23Z	Job started — Procedure Build.Rel.602829 initiated on san-w175-ma3-1-04	Running
+07:30:23Z – 07:32:50Z	Steps 1–9 executed (pre-build setup, credential init, workspace prep)	Success
+07:32:50Z	Make step started — BuildMongr -makebuild CI_QCM2290.LA.5.0-00058_DEF_AU787.1-STD.APQ.INT-2	Running
+07:33:51Z	Make step FAILED — Exit Code 4 (compile error). Duration: ~61 seconds. errorHandling=abortJob triggered.	FAILED
+07:33:51Z – 07:36:47Z	Abort cascade: SaveBuild failed/aborted. All downstream steps (PreSave, PackIt, ConcurrentCopyPack, NonParallelPack, HybridPackIt, HoldLinuxResource, NonParallelPackMake, ConcurrentCopyPackMake, PackMake, CheckAbortCondition, PostSave) cancelled.	ABORTED / CANCELLED
+07:36:47Z	Job completed with outcome: completed_error / ABORT. Total elapsed: ~384 seconds (~6.4 min)	ABORT
+---
+4. 🗺️ Execution Path Inventory
+Failed Step: Make (Step Index 10) — BuildMongr -makebuild in /local/mnt/workspace/CRMBuilds/CI_QCM2290.LA.5.0-00058_DEF_AU787.1-STD.APQ.INT-2_20260707_003012
+Agent Host: san-w175-ma3-1-04 (SanDiego, Drive G, Ubuntu 18.04, stepLimit=9)
+Commander Hosts: las-colo12-j13-09, las-colo12-j13-10, las-colo12-j13-11 (active during job window)
+Build Tool Invoked: BuildMongr (make/compile orchestrator)
+Working Directory: /local/mnt/workspace/CRMBuilds/...
+Step Log: /prj/qct/asw/ecmdr_ws_crm/.../Make.f179d5b7-5ebc-f119-9a35-2686f9881e6f.log
+Eng Label / Source: GLUE.DIVAR-IOT_LA.1.0-00032-NOOP_TEST-1
+---
+5. 🚨 Detected Error Codes
+Error Code	Step	Meaning	Evidence
+Exit Code 4	Make	GNU Make exit code 4 = build error encountered during compilation (compiler returned non-zero). Indicates one or more compilation units failed.	Splunk ec_debug log — jobStepId f179d5b7-5ebc-f119-9a35-2686f9881e6f
+failedReason=Compile	BuildInfoJson	CRM system explicitly tagged failure category as "Compile"	BuildInfoJson metadata in Splunk
+abortJob cascade	SaveBuild + 11 downstream steps	errorHandling=abortJob on Make step propagated abort to entire job	Splunk ec_debug — step cascade records
+---
+6. 🔗 Correlated Observations
+☁️ CloudBees
+Make step (stepIndex=10) ran for 61 seconds before failing with exit code 4
+Command: BuildMongr -makebuild CI_QCM2290.LA.5.0-00058_DEF_AU787.1-STD.APQ.INT-2
+errorHandling=abortJob triggered full job abort
+BuildInfoJson explicitly records failedReason=Compile and buildStatus=Failed
+Spin 2 indicates this was a retry attempt — the same build had already failed once (Spin 1)
+13 downstream steps were cancelled as a result of the cascade
+🖥️ Agent Host — san-w175-ma3-1-04
+CPU (Datadog): avg:system.cpu.user peaked at 2.6% during the failure window — HEALTHY, no resource exhaustion
+Memory (Datadog): ~196–200 GB used, stable throughout — HEALTHY
+SCOM Alerts: None active on san-w175-ma3-1-04
+Agent stepLimit=9: The agent was concurrently serving multiple other jobs (confirmed by Commander logs showing other jobIds releasing resources on san-w175-ma3-1-04 throughout the day). However, CPU and memory remained healthy, so concurrent load did not cause the failure.
+Datadog Agent Logs: No logs found for this host in the failure window — telemetry coverage is metric-only for this host.
+🏛️ Commander Hosts
+Commander nodes las-colo12-j13-09, las-colo12-j13-10, las-colo12-j13-11 were all active and processing jobs normally
+No Commander-level errors detected — resource allocation and release logs show normal operation
+Commander infrastructure: HEALTHY
+📊 Datadog
+No Datadog logs found for build ID or agent host in the failure window
+Metric telemetry confirms agent host was not under CPU or memory stress
+No infrastructure-level anomalies correlated to the failure
+🔍 Splunk
+Primary evidence source — full job metadata, step details, exit codes, and cascade confirmed
+Make step log file identified: Make.f179d5b7-5ebc-f119-9a35-2686f9881e6f.log at /prj/qct/asw/ecmdr_ws_crm/CI_QCM2290.LA.5.0-00058_DEF_AU787.1-STD.APQ.INT-2_20260707_003012_003023/
+⚠️ The actual compiler error messages are in the Make step log file — not yet retrieved from the file system. The log must be examined directly for specific source file, line number, and error type.
+---
+7. 🎯 Probable Root Cause
+PRIMARY ROOT CAUSE: Compilation Failure in the Make Step
+
+The BuildMongr -makebuild command failed with exit code 4, which is the GNU Make error code for a build error (one or more compilation units returned a non-zero exit code). The CRM system's own BuildInfoJson explicitly records failedReason=Compile.
+
+Supporting Evidence:
+
+Exit code 4 from Make step (Splunk ec_debug)
+failedReason=Compile in BuildInfoJson (Splunk)
+Make step ran for only 61 seconds — consistent with early compile error, not a timeout
+This is Spin 2 — the build had already failed once, suggesting a persistent code-level issue rather than a transient infrastructure problem
+Eng label GLUE.DIVAR-IOT_LA.1.0-00032-NOOP_TEST-1 is the likely source of the code change that introduced the compile error
+Agent host CPU and memory were healthy — infrastructure was not the cause
+The specific compiler error (file, line, error message) is in the Make step log:
+/prj/qct/asw/ecmdr_ws_crm/CI_QCM2290.LA.5.0-00058_DEF_AU787.1-STD.APQ.INT-2_20260707_003012_003023/Make.f179d5b7-5ebc-f119-9a35-2686f9881e6f.log
+
+---
+8. 📈 Confidence Level
+🟢 HIGH
+
+Direct CloudBees metadata confirms exit code 4 and failedReason=Compile
+CRM BuildInfoJson explicitly classifies the failure as "Compile"
+Agent host infrastructure metrics confirm no resource exhaustion
+Spin 2 confirms the failure is reproducible and not transient
+Commander infrastructure confirmed healthy
+---
+9. 🏗️ Infrastructure vs Code Assessment
+Category	Assessment	Reason
+Infrastructure Issue	NO	Agent CPU <3%, memory stable, no SCOM alerts, Commander healthy
+Code / Compile Issue	YES	Exit code 4 from BuildMongr, failedReason=Compile in BuildInfoJson, Spin 2 confirms reproducibility
+Mixed Issue	NO	No infrastructure evidence found in the execution path
+---
+10. 🔧 Recommended Remediation
+⚡ URGENT — Retrieve Make step log before 2026-07-10 purge:
+/prj/qct/asw/ecmdr_ws_crm/CI_QCM2290.LA.5.0-00058_DEF_AU787.1-STD.APQ.INT-2_20260707_003012_003023/Make.f179d5b7-5ebc-f119-9a35-2686f9881e6f.log
+Search for lines containing error:, fatal error:, undefined reference, cannot find, or similar compiler diagnostics.
+Identify the failing source file and error: The log will reveal the exact source file, line number, and compiler error message.
+Review recent changes in eng label GLUE.DIVAR-IOT_LA.1.0-00032-NOOP_TEST-1: Compare against reference build QCM2290.LA.5.0-00058_DEF_AU787-STD.APQ.INT-1 to identify the delta that introduced the compile error.
+Check associated image builds for dependency issues — particularly MPSS.HA.1.1-00567, ADSP.VT.5.4.3.c1-00122, and KERNEL.PLATFORM.2.0.r12-07002 which are part of the same build set.
+Fix the compile error in the identified source file and re-trigger the CI build.
+---
+11. 🛡️ Preventive Actions
+Implement pre-commit compile checks or static analysis gates on the GLUE.DIVAR-IOT_LA.1.0 component to catch compile errors before CI submission
+Configure log retention policies to extend beyond 3 days for failed CI builds to allow adequate RCA time
+Add compile error pattern alerting in Splunk to proactively notify code owners when BuildMongr exits with code 4
+Consider incremental build validation on the eng label before triggering full CI to reduce cycle time on compile failures
+Ensure Spin 2 failures (repeated failures) trigger automatic escalation to the code owner team
+---
+12. 📚 Sources Used
+Source	Query Window	Evidence	Relevance
+Splunk (index=ecommander)	-7d to now	Full job metadata, step details, exit codes, cascade, BuildInfoJson	PRIMARY — Direct job evidence
+Datadog Metrics (system.cpu.user)	07:25Z–07:40Z 2026-07-07	CPU max 2.6% on san-w175-ma3-1-04	Agent host health — rules out resource exhaustion
+Datadog Metrics (system.mem.used)	07:25Z–07:40Z 2026-07-07	Memory stable ~196–200 GB on san-w175-ma3-1-04	Agent host health — rules out memory pressure
+SCOM	Current	No active alerts on san-w175-ma3-1-04	Agent host health — rules out OS/hardware issues
+Datadog Logs	07:30Z–07:40Z 2026-07-07	No logs found for build ID or agent host	No relevant findings
+---

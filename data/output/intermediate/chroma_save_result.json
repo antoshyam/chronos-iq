@@ -1,0 +1,28 @@
+{
+  "knowledge_name": "RCA Knowledge Graph",
+  "vector_db": "ChromaDb",
+  "collection_name": "rca_knowledge_graph",
+  "persist_directory": "/Users/nsathi/Library/CloudStorage/Dropbox/Applied AI Institute/Clients/Qualcomm/Neena-In-Progress/UseCases/UseCaseBuild/3-ChronousIQ/Log_Analysis_V7/notebook/KG_Construction_Pipeline/data/output/chroma_rca_kg",
+  "record_count": 17,
+  "record_ids": [
+    "cluster_1",
+    "cluster_2",
+    "cluster_3",
+    "cluster_4",
+    "cluster_5",
+    "unmatched_0",
+    "unmatched_3",
+    "unmatched_5",
+    "unmatched_10",
+    "unmatched_12",
+    "unmatched_13",
+    "unmatched_15",
+    "unmatched_16",
+    "unmatched_22",
+    "unmatched_23",
+    "unmatched_27",
+    "unmatched_29"
+  ],
+  "json_output_file": "/Users/nsathi/Library/CloudStorage/Dropbox/Applied AI Institute/Clients/Qualcomm/Neena-In-Progress/UseCases/UseCaseBuild/3-ChronousIQ/Log_Analysis_V7/notebook/KG_Construction_Pipeline/data/output/rca_knowledge_graph_records.json",
+  "document_schema": "models.ExtractedRCA"
+}

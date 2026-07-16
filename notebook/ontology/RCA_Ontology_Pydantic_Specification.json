@@ -1,0 +1,302 @@
+{
+  "title": "RCA Ontology - Pydantic Model Specification",
+  "description": "JSON companion specification derived from RCA_Ontology_Pydantic_Specification.docx, with ontology and relationship example definitions added for notebook use.",
+  "source_files": {
+    "pydantic_specification": "RCA_Ontology_Pydantic_Specification.docx",
+    "ontology": "../RCA Log OWL Ontology.rtf"
+  },
+  "pydantic_structure": {
+    "summary": "Minimal Pydantic class definitions for the agreed RCA Ontology. Each ontology concept contains only three fields: id, name, and description.",
+    "base_model": "BaseModel",
+    "shared_fields": {
+      "id": {
+        "type": "str",
+        "description": "Unique identifier for the ontology entity."
+      },
+      "name": {
+        "type": "str",
+        "description": "Human-readable name for the ontology entity."
+      },
+      "description": {
+        "type": "str",
+        "description": "Explanation of the entity's meaning in the RCA ontology or extracted RCA evidence."
+      }
+    },
+    "classes": [
+      {
+        "name": "Procedure",
+        "purpose": "Build workflow under analysis",
+        "description": "Represents the build workflow or CI/CD procedure under analysis.",
+        "fields": ["id", "name", "description"]
+      },
+      {
+        "name": "Step",
+        "purpose": "Executable unit within a procedure",
+        "description": "Represents an executable unit within a Procedure.",
+        "fields": ["id", "name", "description"]
+      },
+      {
+        "name": "StepClass",
+        "purpose": "Generalization of semantically similar steps, such as Make, Build, or Compile",
+        "description": "Represents a general classification of semantically similar Steps.",
+        "fields": ["id", "name", "description"]
+      },
+      {
+        "name": "LogSymptom",
+        "purpose": "Observable indicator identified during RCA",
+        "description": "Represents an observable indicator identified during RCA.",
+        "fields": ["id", "name", "description"]
+      },
+      {
+        "name": "SystemStatus",
+        "purpose": "Infrastructure or telemetry context associated with a failure",
+        "description": "Represents infrastructure or system context associated with a failure.",
+        "fields": ["id", "name", "description"]
+      },
+      {
+        "name": "RootCause",
+        "purpose": "Diagnosed failure condition",
+        "description": "Represents the diagnosed failure condition.",
+        "fields": ["id", "name", "description"]
+      },
+      {
+        "name": "DataGap",
+        "purpose": "Missing evidence that limited diagnostic confidence",
+        "description": "Represents missing or insufficient evidence that limits diagnostic confidence.",
+        "fields": ["id", "name", "description"]
+      },
+      {
+        "name": "PreventiveAction",
+        "purpose": "Action intended to reduce likelihood of future failures",
+        "description": "Represents an action intended to reduce the likelihood of future failures.",
+        "fields": ["id", "name", "description"]
+      },
+      {
+        "name": "Remediation",
+        "purpose": "Corrective action after failure",
+        "description": "Represents a corrective action taken after a failure.",
+        "fields": ["id", "name", "description"]
+      },
+      {
+        "name": "Annotation",
+        "purpose": "Additional reasoning guidance or constraints",
+        "description": "Represents additional reasoning guidance, constraints, or expert observations.",
+        "fields": ["id", "name", "description"]
+      },
+      {
+        "name": "OntologyRelationship",
+        "purpose": "Semantic relationship defined in the ontology",
+        "description": "Represents one semantic relationship defined in the ontology.",
+        "fields": ["id", "name", "description"]
+      }
+    ]
+  },
+  "ontology_semantics": [
+    {
+      "concept": "Procedure",
+      "purpose": "Build workflow under analysis"
+    },
+    {
+      "concept": "Step",
+      "purpose": "Executable unit within a procedure"
+    },
+    {
+      "concept": "Step Class",
+      "purpose": "Generalization of semantically similar steps, such as Make, Build, or Compile"
+    },
+    {
+      "concept": "Log Symptom",
+      "purpose": "Observable indicator identified during RCA"
+    },
+    {
+      "concept": "System Status",
+      "purpose": "Infrastructure or telemetry context associated with a failure"
+    },
+    {
+      "concept": "Root Cause",
+      "purpose": "Diagnosed failure condition"
+    },
+    {
+      "concept": "Data Gap",
+      "purpose": "Missing evidence that limited diagnostic confidence"
+    },
+    {
+      "concept": "Preventive Action",
+      "purpose": "Action intended to reduce likelihood of future failures"
+    },
+    {
+      "concept": "Remediation",
+      "purpose": "Corrective action after failure"
+    },
+    {
+      "concept": "Annotation",
+      "purpose": "Additional reasoning guidance or constraints"
+    }
+  ],
+  "relationship_semantics": [
+    {
+      "relationship": "has_step",
+      "meaning": "Procedure contains Step"
+    },
+    {
+      "relationship": "sub_class_of",
+      "meaning": "Step belongs to Step Class"
+    },
+    {
+      "relationship": "exhibits",
+      "meaning": "Step exhibits Symptom"
+    },
+    {
+      "relationship": "emits",
+      "meaning": "System emits observable signal"
+    },
+    {
+      "relationship": "indicates",
+      "meaning": "Symptom suggests Root Cause"
+    },
+    {
+      "relationship": "context",
+      "meaning": "Supporting evidence for Root Cause"
+    },
+    {
+      "relationship": "rules_out",
+      "meaning": "Eliminates alternate hypothesis"
+    },
+    {
+      "relationship": "susceptible_to",
+      "meaning": "Historical association between Step and Root Cause"
+    },
+    {
+      "relationship": "contributing_factor",
+      "meaning": "Increases likelihood of Root Cause"
+    },
+    {
+      "relationship": "diagnosis_blocked_by",
+      "meaning": "Missing evidence limits diagnosis"
+    },
+    {
+      "relationship": "mitigated_by",
+      "meaning": "Root Cause may be prevented by an action"
+    },
+    {
+      "relationship": "remediated_by",
+      "meaning": "Root Cause may be corrected by an action"
+    }
+  ],
+  "example_definition": {
+    "concept_instances": {
+      "procedure": {
+        "id": "procedure_build_workflow",
+        "name": "Build Workflow",
+        "description": "Build workflow under analysis."
+      },
+      "step": {
+        "id": "step_compile",
+        "name": "Compile",
+        "description": "Executable compile unit within the procedure."
+      },
+      "step_class": {
+        "id": "step_class_compile",
+        "name": "Compile",
+        "description": "General class for semantically similar compile steps."
+      },
+      "log_symptom": {
+        "id": "symptom_build_failure",
+        "name": "Build Failure",
+        "description": "Observable failure indicator identified during RCA."
+      },
+      "system_status": {
+        "id": "status_runner_context",
+        "name": "Runner Context",
+        "description": "Infrastructure or telemetry context associated with the failure."
+      },
+      "root_cause": {
+        "id": "root_cause_dependency_issue",
+        "name": "Dependency Issue",
+        "description": "Diagnosed failure condition supported by RCA evidence."
+      },
+      "data_gap": {
+        "id": "data_gap_missing_trace",
+        "name": "Missing Trace",
+        "description": "Missing evidence that limited diagnostic confidence."
+      },
+      "preventive_action": {
+        "id": "preventive_action_pin_dependencies",
+        "name": "Pin Dependencies",
+        "description": "Action intended to reduce likelihood of future failures."
+      },
+      "remediation": {
+        "id": "remediation_update_dependency",
+        "name": "Update Dependency",
+        "description": "Corrective action after failure."
+      },
+      "annotation": {
+        "id": "annotation_use_only_evidence",
+        "name": "Use Only Evidence",
+        "description": "Additional reasoning guidance or constraint for RCA extraction."
+      }
+    },
+    "relationship_instances": [
+      {
+        "id": "rel_procedure_has_step_compile",
+        "name": "has_step",
+        "description": "Procedure contains Step."
+      },
+      {
+        "id": "rel_compile_instance_of_compile_class",
+        "name": "instance_of",
+        "description": "Step belongs to Step Class."
+      },
+      {
+        "id": "rel_compile_exhibits_build_failure",
+        "name": "exhibits",
+        "description": "Step exhibits Symptom."
+      },
+      {
+        "id": "rel_runner_emits_build_failure",
+        "name": "emits",
+        "description": "System emits observable signal."
+      },
+      {
+        "id": "rel_symptom_indicates_root_cause",
+        "name": "indicates",
+        "description": "Symptom suggests Root Cause."
+      },
+      {
+        "id": "rel_status_context_root_cause",
+        "name": "context",
+        "description": "Supporting evidence for Root Cause."
+      },
+      {
+        "id": "rel_status_rules_out_alternate",
+        "name": "rules_out",
+        "description": "Eliminates alternate hypothesis."
+      },
+      {
+        "id": "rel_compile_susceptible_to_dependency_issue",
+        "name": "susceptible_to",
+        "description": "Historical association between Step and Root Cause."
+      },
+      {
+        "id": "rel_status_contributing_factor_root_cause",
+        "name": "contributing_factor",
+        "description": "Increases likelihood of Root Cause."
+      },
+      {
+        "id": "rel_root_cause_blocked_by_missing_trace",
+        "name": "diagnosis_blocked_by",
+        "description": "Missing evidence limits diagnosis."
+      },
+      {
+        "id": "rel_root_cause_mitigated_by_pin_dependencies",
+        "name": "mitigated_by",
+        "description": "Root Cause may be prevented by an action."
+      },
+      {
+        "id": "rel_root_cause_remediated_by_update_dependency",
+        "name": "remediated_by",
+        "description": "Root Cause may be corrected by an action."
+      }
+    ]
+  }
+}

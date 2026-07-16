@@ -1,0 +1,342 @@
+---
+job_id: f1792e9f-a715-f1fb-a1bd-2686f9881e6f
+chat_id: FG3FXSJ8S12R7JANVBAT
+generated_at: 2026-07-07T20:10:31.478437
+source: NOVA
+partial_response: False
+---
+
+I now have all the data needed to compile the complete RCA report. The Datadog ECR logs are from unrelated Kubernetes/cloud-operator hosts — **OUT_OF_SCOPE** per the exclusion rules. The Commander "NoSuchJob" exceptions are normal polling behavior for already-completed jobs — not errors. I have sufficient evidence to produce the full report.
+
+---
+
+# CloudBees CD/RO — Root Cause Analysis Report
+
+---
+
+## # 1 Summary
+
+CloudBees job **TZ.XF.5.1-01227-MANNARAAAAANAZT-1_20260706_043404_043417** (Job ID: `f1792e9f-a715-f1fb-a1bd-2686f9881e6f`) failed on **2026-07-06** with a final status of `completed_error / ABORT`. The sole failing step was **Make**, which exited with **exit code 125** after running for approximately **20 minutes and 48 seconds** on agent host **san-w175-ma3-2-08**.
+
+Exit code 125 is the Docker-reserved exit code meaning **the Docker container could not be created or started** — it does not indicate an internal build failure. The step attempted to launch a Docker container using image `019415958841.dkr.ecr.us-west-2.amazonaws.com/bsaas-tz/tz.xf.5.2:16.04.20260615.9` from AWS ECR (us-west-2) with up to 5 retries. All retries exhausted and the step returned exit code 125, triggering the `abortJob` error-handling policy.
+
+A significant contributing factor observed on the agent host is **sustained near-maximum memory utilization** (~200 GB, ~97–100% of capacity) beginning approximately 5 minutes into the step and persisting for the remainder of the execution window. This memory pressure is consistent with Docker daemon resource exhaustion or OOM conditions that would prevent container creation.
+
+The exact Docker error message (e.g., OOM kill, daemon crash, image pull failure, or container name conflict) requires direct examination of the step log file: `Make.f1792e9f-b23a-f137-b8a0-4efb9ff91010.log` on agent `san-w175-ma3-2-08`.
+
+---
+
+## # 2 Job Context
+
+| Field | Value |
+|---|---|
+| **Job ID** | `f1792e9f-a715-f1fb-a1bd-2686f9881e6f` |
+| **Job Name** | `TZ.XF.5.1-01227-MANNARAAAAANAZT-1_20260706_043404_043417` |
+| **Build ID** | `TZ.XF.5.1-01227-MANNARAAAAANAZT-1` |
+| **Project** | `CRMBuilds` |
+| **Procedure** | `Build.Container.Rel.602829` |
+| **Launched By** | `tiberiumUserEC10_11` |
+| **Run As** | `tiberiumUserEC10_11` |
+| **Execution Node** | `san-w175-ma3-2-08` (Ubuntu 18.04, kernel 5.4.0-187-generic, x86_64) |
+| **Agent ID** | `f0ec3fef-2e77-f1fa-8871-2686f9881e6f` |
+| **Workspace** | `crm_ws_sd` → `/prj/qct/asw/ecmdr_ws_crm/TZ.XF.5.1-01227-MANNARAAAAANAZT-1_20260706_043404_043417` |
+| **Commander Endpoint** | `qso-bicmdr.qualcomm.com` |
+| **Job Start** | `2026-07-06T11:34:17.903Z` (04:34:17 PDT) |
+| **Job Finish** | `2026-07-06T12:03:00.334Z` (05:03:00 PDT) |
+| **Elapsed** | 28 minutes 43 seconds |
+| **Final Status** | `completed_error` |
+| **Outcome** | `error` |
+| **AbortStatus** | `ABORT` |
+| **Workflow Type** | `ONPREMCONTAINERIZED` |
+| **Host OS** | `Ubuntu16_04` (container target) |
+| **Site** | `SanDiego` |
+| **Filer Path** | `/prj/qct/asw/crmbuilds/snowcone/builds674/PROD/TZ.XF.5.1-01227-MANNARAAAAANAZT-1` |
+
+---
+
+## # 3 Build Timeline
+
+| Time (UTC) | Event |
+|---|---|
+| `11:34:17.903Z` | Job created and dispatched |
+| `11:34:17.957Z` | **Make step assigned** to `san-w175-ma3-2-08`, execution begins |
+| `11:34:25.217Z` | Docker Login step assigned (concurrent, same agent) |
+| `11:34:25.266Z` | Docker Login step invoked |
+| `11:34:28.756Z` | Docker Login step released — **outcome: success** |
+| `~11:38:00Z` | **Large outbound network burst begins** on agent (~64 MB avg, peak ~90 MB) — consistent with Docker image pull or compile package fetch |
+| `~11:39:00Z` | **Memory on agent reaches ~200 GB ceiling** (~97–100% utilization) — sustained for remainder of window |
+| `~11:43:00Z` | Network burst subsides; memory remains at ceiling |
+| `~11:55:28Z` | CPU spike to 18.44% (transient, not sustained) |
+| `12:00:13.533Z` | **Make step completes with exit code 125** (elapsed: 1,248.46 seconds / ~20.8 min) |
+| `12:00:13.550Z` | Commander (`las-colo12-j13-11`) commits result: outcome transitions `success → error` |
+| `12:00:13.576Z` | `StepCompletionPrecondition` confirms `readyToComplete=true`, `outcome=error`, `errorHandling=abortJob` |
+| `12:00:13.577Z` | `StepCompletedAction` transitions step `running → completed` |
+| `12:00:13.589Z` | Resource usage record deleted; agent resource released |
+| `12:00:23.797Z` | `make_spacer` step canceled (`errorCode=CANCELED`) as downstream consequence of Make abort |
+| `12:03:00.334Z` | Job finalized — `completed_error / ABORT` |
+
+---
+
+## # 4 Execution Path Inventory
+
+### Failed Step
+
+| Field | Value |
+|---|---|
+| **Step Name** | `Make` |
+| **Step ID** | `f1792e9f-b23a-f137-b8a0-4efb9ff91010` |
+| **Assigned Resource** | `san-w175-ma3-2-08` |
+| **Step Start** | `2026-07-06T11:34:17.957Z` |
+| **Step End** | `2026-07-06T12:00:13.533Z` |
+| **Duration** | 1,248.46 seconds (~20 min 48 sec) |
+| **Exit Code** | **125** |
+| **Step Status** | `completed_error` |
+| **Error Handling** | `abortJob` |
+| **Log File** | `Make.f1792e9f-b23a-f137-b8a0-4efb9ff91010.log` on `san-w175-ma3-2-08` |
+
+### Agent Host
+
+| Field | Value |
+|---|---|
+| **Hostname** | `san-w175-ma3-2-08` |
+| **IP** | `10.81.104.51` |
+| **OS** | Ubuntu 18.04, kernel 5.4.0-187-generic, x86_64 |
+| **Agent ID** | `f0ec3fef-2e77-f1fa-8871-2686f9881e6f` |
+| **Step Limit** | 9 |
+| **Peak Concurrent Steps** | 5–6 (within limit) |
+| **SCOM Alerts** | None |
+| **CAPM Availability** | No data available |
+| **Datadog Logs** | No logs indexed for this host |
+
+### Commander Hosts
+
+| Node | IP | Role |
+|---|---|---|
+| `las-colo12-j13-09` | `10.81.104.241` | API node (received `finishCommand` from agent) |
+| `las-colo12-j13-10` | `10.81.104.242` | Scheduling node |
+| `las-colo12-j13-11` | `10.81.104.243` | State machine / step completion processing |
+
+### Invoked External Services (In-Scope)
+
+| Service | Endpoint | Role |
+|---|---|---|
+| **AWS ECR** | `019415958841.dkr.ecr.us-west-2.amazonaws.com` | Docker image source for Make step |
+| **Compile Package Filer** | `/local/mnt/workspace/CRMBuilds/TZ.XF.5.1-01227-MANNARAAAAANAZT-1/compile_package/compile_package_latest.tar.gz` | Compile package fetch via `fetch_compile_package.sh` |
+| **PCM WebService** | `pcm.qualcomm.com` | Build metadata |
+| **CSDS** | `csds.qualcomm.com` | Build support service |
+| **Tiberium2 WS** | `tiberium2ws.qualcomm.com` | Workflow service |
+| **Sign Server** | `crm-sign` (CASS, port 50103) | Code signing |
+| **CRM DB** | `oil.qualcomm.com` | Build database |
+
+---
+
+## # 5 Detected Error Codes
+
+| Code | Source | Evidence |
+|---|---|---|
+| **Exit Code 125** | CloudBees / Docker | Agent submitted `finishCommand` with `exit=125` to Commander API at `10.81.104.241:8000`. Confirmed via Splunk `index=ecommander` — `CommitCommandResultsOperation` on `las-colo12-j13-11` transitioned outcome from `success` to `error`. Docker exit code 125 = **container could not be created or started**. |
+| **ABORT** | CloudBees | `errorHandling=abortJob` on Make step triggered job-level abort. Confirmed via `StepCompletionPrecondition` and `StepCompletedAction` events on Commander. |
+| **CANCELED** | CloudBees | `make_spacer` step received `errorCode=CANCELED` as a downstream consequence of the Make step abort. `errorHandling=ignore` — did not contribute to failure. |
+
+---
+
+## # 6 Correlated Observations
+
+### CloudBees
+
+- **Exit code 125 confirmed** via `finishCommand` API call from agent `san-w175-ma3-2-08` (IP `10.81.104.51`) to Commander `las-colo12-j13-09` at `10.81.104.241:8000`.
+- The Make step ran for **1,248.46 seconds** before returning exit code 125. This duration is consistent with Docker retry behavior (up to 5 retries configured in the step command), each retry potentially waiting before failing.
+- `postpExit=0` and `deletedPostpLogFile=1` indicate the post-processing script completed normally — the failure was in the primary Docker execution, not in post-processing.
+- `make_spacer` step was canceled as a downstream consequence — **not a contributing cause**.
+- All other steps (PostSync, BBS_strip, Strip, strip_spacer, LabelBuild, CheckInArtifacts, FixBuildStatus, Finalize) completed with **outcome=success** — failure was isolated to the Make step.
+- Docker Login step completed **successfully** at `11:34:28Z` — ECR authentication credentials were valid at job start.
+
+### Agent Host (`san-w175-ma3-2-08`)
+
+**Datadog Metrics — Correlation Window: `11:34:17Z → 12:00:13Z`**
+
+| Metric | Observation | Assessment |
+|---|---|---|
+| **CPU (system.cpu.user)** | Avg 5.92%, max 18.44% (transient spike ~11:55Z). Low and stable overall. | ✅ No CPU saturation. Not a contributing factor. |
+| **Memory (system.mem.used)** | Rose sharply from ~176 GB at job start to **~200 GB ceiling by ~11:39Z** (gain of ~24 GB in ~5 min). Remained at ceiling (~200–200.7 GB) for the **remaining ~21 minutes** of the step with no recovery. | ⚠️ **CRITICAL SIGNAL** — Sustained near-maximum memory utilization throughout the Make step execution window. Consistent with Docker image pull loading memory, or a memory leak/OOM condition preventing container creation. |
+| **Disk (system.disk.in_use)** | Flat at 54.6% throughout. No variation. | ✅ No disk pressure. Not a contributing factor. |
+| **Network Out (system.net.bytes_sent)** | Large burst ~11:38–11:43Z (avg 64 MB, peak ~90.75 MB). Subsided after ~11:43Z. | ℹ️ Consistent with Docker image pull from AWS ECR or compile package fetch. Network was functional. |
+
+**Concurrent Jobs on Same Agent:**
+
+| Job ID | Build Name | Steps | Outcome |
+|---|---|---|---|
+| `f1792e9e-b478-f19c-905f-2686f9881e6f` | `TZ.XF.5.1-01227-ADJKAMORTAAANAZT-1_20260706_043401_043416` | Docker Login (concurrent) | Success |
+| `f1792dcf-2c92-f1bf-84b8-2686f9881e6f` | `CI_WLAN.MN.2.0-02155.1 InitCredentials` | InitCredentials | Success (completed before Make step) |
+| `f179256f-68dd-f11a-8946-2686f9881e6f` | `MPSS.DE.3.1.7-00717.2 InitCredentials` | InitCredentials | Success (completed before Make step) |
+| `f1792620-85be-f1ed-80ff-4efb9ff91010` | `MPSS.KI.1.0-02640.14 InitCredentials` | InitCredentials | Success (completed before Make step) |
+
+> **Assessment:** The concurrent job `f1792e9e-b478-f19c-905f-2686f9881e6f` ran a Docker Login step simultaneously on the same agent. Combined stepCount peaked at 5–6, within the stepLimit of 9. The three InitCredentials jobs completed before the Make step failure window. The concurrent Docker Login job is a **potential contributor** to memory pressure if it also launched a Docker container on the same host.
+
+**SCOM:** No active alerts for `san-w175-ma3-2-08`. No SCOM performance targets discovered.
+
+**CAPM:** No availability data for `san-w175-ma3-2-08` in the 24-hour window.
+
+**Datadog Logs:** No logs indexed for `san-w175-ma3-2-08` in the failure window. Agent host has **partial telemetry coverage** (metrics only; no log coverage).
+
+### Commander Hosts
+
+- **`las-colo12-j13-11`**: Processed Make step state machine transitions correctly. No errors or exceptions related to this job. Normal operation confirmed.
+- **`las-colo12-j13-10`**: Handled scheduling. `NoSuchJob` exceptions observed are **normal polling behavior** for already-completed/purged jobs from other workflows — not related to this job.
+- **`las-colo12-j13-09`**: Received `finishCommand` from agent. `NoSuchJob` exceptions are same normal polling behavior — not related to this job.
+- **Commander Assessment:** All three Commander nodes operated normally. No Commander-side errors contributed to the failure.
+
+### Datadog
+
+- **Agent host logs:** 0 results for `san-w175-ma3-2-08` in the failure window. No log coverage.
+- **ECR/Docker logs from Datadog:** Logs returned were from `ip-10-185-57-130.us-west-2.compute.internal` (Kubernetes application-operator in `konstruct-mgmt-dev`) — **OUT_OF_SCOPE**. These are unrelated ECR repository creation errors from a different system with no connection to the CloudBees job or agent host.
+- **Datadog metrics:** CPU, memory, disk, and network metrics collected for `san-w175-ma3-2-08` — see Agent Host section above.
+
+### Splunk
+
+- **`index=ecommander`**: Primary data source. Confirmed job metadata, step execution, exit code 125, Commander processing, agent details, and concurrent job activity. All findings documented above.
+
+### External Dependency
+
+- **AWS ECR (`019415958841.dkr.ecr.us-west-2.amazonaws.com`):** Docker Login step succeeded at `11:34:28Z`, confirming ECR authentication was valid at job start. The large network burst at `~11:38–11:43Z` is consistent with a Docker image pull attempt from ECR. Whether the pull succeeded or failed cannot be determined without the step log. No direct evidence of ECR service degradation was found within the in-scope data sources.
+- **Compile Package Filer:** `fetch_compile_package.sh` was invoked as part of the Make step command. No evidence of filer failure found.
+
+---
+
+## # 7 Probable Root Cause
+
+**Primary Root Cause: Docker container creation failure on agent `san-w175-ma3-2-08`, evidenced by exit code 125.**
+
+**Supporting Evidence:**
+
+1. **Exit code 125** is Docker's reserved exit code for "container could not be created or started." This is distinct from exit code 1 (internal build error) or exit code 137 (OOM kill of running container). Source: CloudBees `finishCommand` API call, confirmed in `index=ecommander`.
+
+2. **Sustained near-maximum memory utilization** on the agent host: memory rose from ~176 GB to ~200 GB (ceiling) within the first 5 minutes of the step and remained at the ceiling for the entire remaining ~21 minutes. This is consistent with:
+   - Docker daemon being unable to allocate memory for a new container (OOM condition)
+   - Docker image layers consuming available memory during pull
+   - A memory leak in a concurrent Docker process on the same host
+
+3. **Step duration of 1,248 seconds (~20.8 min)** with up to 5 retries configured: the step exhausted all retries before returning exit code 125, indicating a persistent failure condition rather than a transient one.
+
+4. **Docker Login succeeded** at `11:34:28Z` — ECR credentials were valid. The failure occurred during container creation, not authentication.
+
+5. **Network burst at `~11:38–11:43Z`** is consistent with a Docker image pull attempt from AWS ECR. The burst subsiding after ~5 minutes while memory remained at ceiling suggests the image pull may have completed but container creation subsequently failed due to memory exhaustion.
+
+**Most Probable Specific Cause:** The Docker daemon on `san-w175-ma3-2-08` was unable to create the container `Make_TZ.XF.5.1-01227-MANNARAAAAANAZT-1_20260706_043404` due to **memory exhaustion on the agent host**, after all 5 retries were exhausted over ~20 minutes.
+
+**Alternative Causes (cannot be excluded without step log):**
+- Pre-existing container name conflict (`Make_TZ.XF.5.1-01227-MANNARAAAAANAZT-1_20260706_043404` already existed from a prior run)
+- Docker daemon crash or unresponsive state
+- Docker image pull failure from AWS ECR (partial pull, corrupted layers)
+
+---
+
+## # 8 Confidence Level
+
+### MEDIUM
+
+**Rationale:**
+
+- **HIGH confidence** elements:
+  - Exit code 125 is confirmed directly from CloudBees `finishCommand` API data in Splunk (`index=ecommander`) — this is authoritative.
+  - Memory saturation on the agent host is confirmed by Datadog metrics with direct temporal correlation to the step execution window.
+  - Commander processed the failure correctly — Commander is not a contributing cause (HIGH confidence).
+  - Docker Login success confirms ECR credentials were valid (HIGH confidence).
+
+- **Limiting factors preventing HIGH overall confidence:**
+  - The **step log file** (`Make.f1792e9f-b23a-f137-b8a0-4efb9ff91010.log`) has not been examined. This log would contain the exact Docker error message (e.g., `docker: Error response from daemon: ...`) and confirm whether the failure was OOM, name conflict, daemon error, or image pull failure.
+  - **No Datadog log coverage** exists for `san-w175-ma3-2-08` — agent-level Docker daemon logs, syslog, and `/var/log/docker.log` are not available through monitoring.
+  - **CAPM has no availability data** for the agent host — network-level reachability cannot be confirmed.
+  - The exact Docker error subtype cannot be determined from available telemetry alone.
+
+---
+
+## # 9 Infrastructure vs Code Assessment
+
+| Assessment | Result |
+|---|---|
+| **Infrastructure Issue** | **YES** |
+| **Code Issue** | **NO** |
+| **Mixed** | **NO** |
+
+**Reason:**
+
+Exit code 125 indicates Docker container creation failure — this is an infrastructure-layer failure occurring before any build code executes inside the container. The failure is on the agent host infrastructure (Docker daemon, memory resources) or in the container runtime environment. No compiler errors, build errors, syntax errors, missing symbols, or test failures were observed. The `failedReason=Compile` field in the CloudBees job metadata reflects the step classification (`Make`/compile step), not a confirmed compiler error.
+
+---
+
+## # 10 Recommended Remediation
+
+1. **Examine the step log immediately:**
+   - File: `Make.f1792e9f-b23a-f137-b8a0-4efb9ff91010.log` on agent `san-w175-ma3-2-08`
+   - Look for: `docker: Error response from daemon:`, `OOM`, `cannot allocate memory`, `Conflict. The container name`, `no space left on device`, `pull access denied`
+   - This will confirm the exact Docker failure mode.
+
+2. **Investigate memory state on `san-w175-ma3-2-08`:**
+   - Determine total physical memory capacity vs. the ~200 GB ceiling observed.
+   - Identify which processes consumed the ~24 GB spike at `~11:39Z`.
+   - Check for Docker container leaks: `docker ps -a` — look for stopped/exited containers from prior builds that were not cleaned up.
+   - Run `docker system df` to assess Docker disk and memory usage.
+
+3. **Check for container name conflicts:**
+   - Verify whether container `Make_TZ.XF.5.1-01227-MANNARAAAAANAZT-1_20260706_043404` existed prior to this job run.
+   - If so, implement pre-step cleanup: `docker rm -f <container_name>` before each Make step invocation.
+
+4. **Review Docker daemon health on the agent:**
+   - Check `/var/log/docker.log` or `journalctl -u docker` on `san-w175-ma3-2-08` for daemon errors during `11:34Z–12:00Z`.
+   - Verify Docker daemon was running and responsive throughout the step window.
+
+5. **Retry the build:**
+   - If memory pressure was transient (caused by concurrent workloads), retrying the build may succeed.
+   - Consider scheduling the retry during a lower-load period on the agent.
+
+---
+
+## # 11 Preventive Actions
+
+1. **Implement Docker container cleanup in the Make step script:**
+   - Add a pre-execution check: `docker rm -f <container_name> 2>/dev/null || true` before `docker run` to prevent name conflicts from prior failed runs.
+
+2. **Implement agent memory monitoring thresholds:**
+   - Create a Datadog monitor alerting when `system.mem.used` on `CRMBuildsLinux-Ubuntu18-04` pool agents exceeds 85% for more than 5 minutes.
+   - Prevent new high-memory steps from being dispatched to agents already under memory pressure.
+
+3. **Implement Docker resource limits:**
+   - Set explicit `--memory` limits on Docker container invocations in the Make step to prevent any single container from consuming all available host memory.
+
+4. **Implement Docker daemon health checks:**
+   - Add a pre-step health check: `docker info` or `docker ps` before attempting container creation. If the daemon is unresponsive, fail fast with a descriptive error rather than retrying for 20 minutes.
+
+5. **Enable agent-level log forwarding to Datadog/Splunk:**
+   - Forward Docker daemon logs (`/var/log/docker.log`), syslog, and CloudBees agent logs from `san-w175-ma3-2-08` to a centralized log platform to enable faster RCA in future incidents.
+
+6. **Review concurrent job scheduling on the agent:**
+   - The agent ran multiple Docker-based jobs concurrently. Evaluate whether the `stepLimit=9` is appropriate given the memory footprint of containerized build steps. Consider reducing the effective concurrent Docker container limit.
+
+7. **Implement post-build Docker cleanup:**
+   - Ensure all Docker containers, images, and volumes are pruned after each build step: `docker container prune -f`, `docker image prune -f`.
+
+---
+
+## # 12 Sources Used
+
+| # | Source Type | Query Window | Evidence | Relevance |
+|---|---|---|---|---|
+| 1 | **Splunk** `index=ecommander` (broad) | Last 7 days | Job metadata, step details, exit code 125, agent assignment, Commander nodes, concurrent jobs, external services | Primary CloudBees job data source — HIGH relevance |
+| 2 | **Splunk** `index=ecommander` (step-scoped) | `11:34:00Z–12:01:00Z` | Commander state machine transitions, `CommitCommandResultsOperation`, `finishCommand` with `exit=125`, `postpExit=0`, elapsed time 1248.46s | Confirmed exit code and step completion sequence — HIGH relevance |
+| 3 | **Splunk** `index=ecommander` (agent-scoped) | `11:34:00Z–12:01:00Z` | Agent details (Ubuntu 18.04, kernel, stepLimit=9), Docker Login success, concurrent job `f1792e9e-b478-f19c-905f-2686f9881e6f`, three prior InitCredentials jobs | Agent context and concurrent workload — HIGH relevance |
+| 4 | **Splunk** `index=ecommander` (Commander-scoped) | `11:34:00Z–12:01:00Z` | Commander `NoSuchJob` exceptions (normal polling behavior for other jobs), `NoSuchProperty` exceptions (unrelated jobs) — no Commander errors for this job | Commander health validation — MEDIUM relevance |
+| 5 | **Datadog Metrics** `system.cpu.user` | `11:34:00Z–12:00:50Z` | Avg 5.92%, max 18.44% (transient). No CPU saturation. | Agent CPU health — MEDIUM relevance |
+| 6 | **Datadog Metrics** `system.mem.used` | `11:34:00Z–12:00:50Z` | **CRITICAL:** Rose from ~176 GB to ~200 GB ceiling by ~11:39Z; sustained at ceiling for remainder of step | Agent memory pressure — HIGH relevance |
+| 7 | **Datadog Metrics** `system.disk.in_use` | `11:34:00Z–12:00:50Z` | Flat at 54.6%. No disk pressure. | Agent disk health — MEDIUM relevance |
+| 8 | **Datadog Metrics** `system.net.bytes_sent` | `11:34:00Z–12:00:50Z` | Large burst ~11:38–11:43Z (peak ~90.75 MB). Consistent with Docker image pull. | Network activity correlation — MEDIUM relevance |
+| 9 | **Datadog Logs** `host:san-w175-ma3-2-08` | `11:34:00Z–12:01:00Z` | **0 results.** No log coverage for agent host. | Agent log gap — noted explicitly |
+| 10 | **Datadog Logs** (Docker/ECR broad) | `11:34:00Z–12:01:00Z` | 32,426 results returned — all from `ip-10-185-57-130.us-west-2.compute.internal` (Kubernetes application-operator). **OUT_OF_SCOPE** — no connection to agent host or CloudBees job. | Excluded per scope rules |
+| 11 | **SCOM** `san-w175-ma3-2-08` | Current | No active alerts. No performance targets discovered. | Agent SCOM health — LOW relevance (no data) |
+| 12 | **SCOM** `las-colo12-j13-09` | Current | No active alerts. | Commander SCOM health — LOW relevance (no data) |
+| 13 | **CAPM** `san-w175-ma3-2-08` | Last 24h | No availability data found. | Agent network availability — LOW relevance (no data) |
+
+---
+
+> **⚠️ Data Gap Notice:**
+> Agent host `san-w175-ma3-2-08` has **no Datadog log coverage** and **no CAPM availability data**. The exact Docker error message cannot be determined from monitoring data alone. **The step log file `Make.f1792e9f-b23a-f137-b8a0-4efb9ff91010.log` on `san-w175-ma3-2-08` must be examined directly to confirm the specific Docker failure mode.** The memory saturation evidence from Datadog metrics provides strong circumstantial support for an infrastructure/resource exhaustion root cause, but definitive confirmation requires the step log.

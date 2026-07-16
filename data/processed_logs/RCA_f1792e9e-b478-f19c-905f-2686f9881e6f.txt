@@ -1,0 +1,9 @@
+---
+job_id: f1792e9e-b478-f19c-905f-2686f9881e6f
+chat_id: YN8W91SN7RS03TB5GXJC
+generated_at: 2026-07-07T20:27:42.835674
+source: NOVA
+partial_response: True
+---
+
+I now have rich CloudBees metadata. Let me now search for the step log file and agent host telemetry in parallel.

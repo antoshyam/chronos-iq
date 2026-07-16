@@ -1,0 +1,255 @@
+---
+job_id: f1792e93-983b-f18d-8dc3-4efb9ff91010
+chat_id: KMZ76FHYE9VJKJ22XBZR
+generated_at: 2026-07-07T20:33:46.376603
+source: NOVA
+partial_response: False
+---
+
+I now have all the data needed to compile the comprehensive RCA report. Let me produce it.
+
+---
+
+# CloudBees CD/RO — Root Cause Analysis Report
+
+**Job ID:** `f1792e93-983b-f18d-8dc3-4efb9ff91010`
+**Report Generated:** 2026-07-06 | Sources: Splunk (index=ecommander), Datadog Metrics, Datadog Logs
+
+---
+
+## # 1 Summary
+
+A containerized TrustZone firmware compile job (`TZ.XF.5.1-01227-AUTKAMORTAAANAZT-1`) failed on CloudBees CD/RO agent host **san-w175-ha1-4-06** at 12:01:09 UTC on 2026-07-06. The failure occurred exclusively in the **Make** step, which attempted to launch a Docker container using an AWS ECR image (`019415958841.dkr.ecr.us-west-2.amazonaws.com/bsaas-tz/tz.xf.5.2:16.04.20260615.9`) to execute a TrustZone compile build. The step returned **exit code 125**, which is a Docker-specific code indicating that `docker run` itself failed to start the container — not a failure inside the container. All retries (up to 5) failed with the same exit code. The CloudBees Commander nodes, agent connectivity, and host-level resources (CPU, memory, disk) were all healthy throughout the failure window. The root cause is a **Docker-layer failure on the agent host** — most likely an ECR image pull failure (expired/missing AWS credentials), a Docker daemon error, or a volume mount issue — that prevented the container from ever starting. The step log file `Make.f1792e93-a5f7-f1fc-bfff-2686f9881e6f.log` must be examined directly to confirm the precise sub-cause.
+
+---
+
+## # 2 Job Context
+
+| Field | Value |
+|---|---|
+| **Job ID** | `f1792e93-983b-f18d-8dc3-4efb9ff91010` |
+| **Job Name** | `TZ.XF.5.1-01227-AUTKAMORTAAANAZT-1_20260706_043353_043357` |
+| **Project** | `CRMBuilds` |
+| **Procedure** | `Build.Container.Rel.602829` |
+| **Launched By** | `tiberiumUserEC10_11` |
+| **Run As** | `aswbldsv` |
+| **Execution Node (Failed Step)** | `san-w175-ha1-4-06` |
+| **Workspace** | `crm_ws_sd` → `/prj/qct/asw/ecmdr_ws_crm/TZ.XF.5.1-01227-AUTKAMORTAAANAZT-1_20260706_043353_043357` |
+| **Start** | `2026-07-06T11:33:57.677Z` |
+| **Finish** | `2026-07-06T12:04:08.668Z` |
+| **Elapsed** | ~30 minutes 11 seconds |
+| **Final Status** | `completed_error` |
+| **Outcome** | `error` |
+| **Error Message** | `Job error [Aborted]: step 'Make' failed and its error handling aborted the job.` |
+| **Abort Property** | `1` |
+
+---
+
+## # 3 Build Timeline
+
+| Time (UTC) | Event |
+|---|---|
+| `2026-07-06T11:33:57.677Z` | Job created and queued by `tiberiumUserEC10_11` |
+| `2026-07-06T11:33:57.744Z` | **Make** step dispatched to agent `san-w175-ha1-4-06` |
+| `2026-07-06T11:33:57.744Z` | Make step begins: unpacks compile package from `/local/mnt/workspace/CRMBuilds/TZ.XF.5.1-01227-AUTKAMORTAAANAZT-1/compile_package/compile_package_latest.tar.gz` |
+| `~11:34–11:48Z` | Docker container launch attempted (up to 5 retries); all attempts fail with exit code 125 |
+| `~11:48:55Z` | CPU spike to 33.37% on `san-w175-ha1-4-06` (consistent with retry activity) |
+| `~11:58:28Z` | Secondary CPU spike to 14.64% (final retry attempt) |
+| `2026-07-06T12:01:09.392Z` | **Make** step terminates — exit code 125, error handling = `abortJob` triggered |
+| `2026-07-06T12:01:09Z` | CPU on agent drops sharply to near-idle (~0.17–0.49%), confirming job process termination |
+| `2026-07-06T12:04:08.668Z` | Job finalized as `completed_error`; Commander nodes log cleanup events |
+| `2026-07-06T12:19:42Z` | Agent request cleanup for both agents completed |
+
+> **Note:** Steps `InitCredentialsAndServer` and `Init` completed successfully (exit code 0) prior to the Make step. The `Calculate metrics` step was scheduled to `crm-ubuntu326` but was never reached due to the abort.
+
+---
+
+## # 4 Execution Path Inventory
+
+| Component | Role | Status |
+|---|---|---|
+| **Failed Step: Make** | Step ID `f1792e93-a5f7-f1fc-bfff-2686f9881e6f` — Docker container launch for TZ compile | ❌ FAILED (exit 125) |
+| **Agent Host: san-w175-ha1-4-06** | Ubuntu 18.04, kernel 5.4.0-187-generic, CloudBees agent v2024.12.0.177508 | ⚠️ Agent alive; Docker layer failed |
+| **Commander Node: las-colo12-j13-09** | `10.81.104.241` — processed job lifecycle events | ✅ Healthy |
+| **Commander Node: las-colo12-j13-10** | `10.81.104.242` — processed job lifecycle events | ✅ Healthy |
+| **AWS ECR Registry** | `019415958841.dkr.ecr.us-west-2.amazonaws.com/bsaas-tz/tz.xf.5.2:16.04.20260615.9` | ⚠️ Pull status unknown — direct evidence unavailable |
+| **Docker Daemon (on agent)** | Required to start container; returned exit 125 | ❌ Failed to start container |
+| **Compile Package Source** | `/local/mnt/workspace/CRMBuilds/.../compile_package_latest.tar.gz` | ✅ Unpack succeeded (step reached Docker launch) |
+| **Build Script** | `trustzone_images/build/ms/build_all.py` — invoked inside container | ❌ Never reached (container did not start) |
+
+**OUT_OF_SCOPE (excluded per RCA rules):**
+- Kubernetes clusters/pods/volumes — no evidence of use in this job
+- IncrediBuild — no evidence of use
+- Jenkins / GitLab CI — not in execution path
+- Other Datadog alerts not referencing this Job ID, agent, or Commander hosts
+
+---
+
+## # 5 Detected Error Codes
+
+| Code | Meaning | Evidence |
+|---|---|---|
+| **Exit Code 125** | `docker run` failed to start the container (Docker daemon-level failure, not an internal build error). Distinct from exit 1 (build error) or exit 127 (command not found). | Splunk `index=ecommander`, Step ID `f1792e93-a5f7-f1fc-bfff-2686f9881e6f`, confirmed in both primary query results |
+| **`completed_error`** | CloudBees job outcome indicating a step failed and error handling aborted the job | CloudBees job metadata, Splunk `index=ecommander` |
+| **`failedReason=Compile`** | BuildInfoJson classification — the build system classified this as a compile-phase failure | Splunk `index=ecommander`, BuildInfoJson field |
+| **`abortJob`** | Error handling policy on the Make step — any non-zero exit triggers immediate job abort | CloudBees step configuration, confirmed in Splunk |
+
+---
+
+## # 6 Correlated Observations
+
+### CloudBees
+
+- **Job metadata confirmed** via Splunk `index=ecommander`: Job ID, name, project, procedure, launched-by, run-as, workspace, start/finish times, and outcome all retrieved directly.
+- **Failed step is exclusively "Make"**: Steps `InitCredentialsAndServer` (exit 0, ~3 seconds) and `Init` (exit 0) completed successfully. The failure is isolated to the Make step.
+- **All 5 Docker retries failed**: The Make step was configured with up to 5 retries on non-zero exit. All retries returned exit code 125, indicating a persistent Docker-layer condition, not a transient flap.
+- **Error handling = `abortJob`**: The Make step's error policy triggered immediate job abort upon failure, preventing any subsequent steps from running.
+- **Second agent request deleted**: A parallel agent request for `san-w175-ma3-2-08` was deleted (not used), confirming the job ran exclusively on `san-w175-ha1-4-06`.
+- **Commander nodes healthy**: `las-colo12-j13-09` and `las-colo12-j13-10` processed all lifecycle events normally. Commander API response times were healthy (getJobStepDetails: 10ms, dispatch: 14ms, DB: 1ms). No Commander errors detected.
+
+### Agent Host (`san-w175-ha1-4-06`)
+
+- **Agent state: alive** throughout the entire job window. Confirmed by multiple Commander log entries showing `agentStatus[state=alive]` at `2026-07-06T12:04:07Z` and later.
+- **Agent version**: `2024.12.0.177508`, protocol 6, OS: `Linux 5.4.0-187-generic #207~18.04.1-Ubuntu`.
+- **CPU**: Average 4.37% across the failure window. Peak 33.37% at ~11:48:55Z (consistent with Docker retry activity). CPU dropped sharply to ~0.17% after 12:01Z, confirming job termination. **No CPU exhaustion.**
+- **Memory**: Average 97.72% usable. Minimum 96.57% usable (~11:50–11:52Z). Decline of ~1.6 percentage points — **no memory pressure or exhaustion.**
+- **Disk**: Average 8.48% used. Peak 8.69%. **No disk space issue.**
+- **Other jobs on same agent**: Splunk evidence shows `san-w175-ha1-4-06` was also assigned steps for job `f1796d6a-8716-f16b-a5c2-4efb9ff91010` (`WLAN.RMH.4.2.c1-00189-QCARMSWC-2_20260706_120340_120347`) during the same window. This job's steps (Init, SyncSetup, BBS_PreSync, Sync) all completed with `outcome=success` and `status=0` agent responses. **No resource contention evidence from the concurrent job.**
+- **Datadog Logs**: No Datadog logs were returned for `san-w175-ha1-4-06` during the failure window (0 results). This means Docker daemon logs, system logs, and application logs are not available via Datadog for this host.
+
+### Commander Host
+
+- **las-colo12-j13-09** (`10.81.104.241`): Processed job step details, setProperty calls, and resource pool queries. All responses returned `status=0`. No errors.
+- **las-colo12-j13-10** (`10.81.104.242`): Processed resource scheduling (assigning `san-w175-ha1-4-06` to job steps), pool queries, and lifecycle events. All normal.
+- **las-colo12-j13-11** (`10.81.104.243`): Processed agent request forwarding and command invocation. All `agentResponse` XML showed `<status>0</status>`. No errors.
+- **Commander contribution to failure**: **None.** No Commander errors, timeouts, or dispatch failures were found in the correlation window.
+
+### Datadog
+
+- **Host inventory**: `san-w175-ha1-4-06` is present in Datadog as a GNU/Linux host.
+- **Metrics (2026-07-06T11:33:00Z – 12:05:00Z)**:
+  - CPU: Avg 4.37%, peak 33.37% — normal for a build host; no exhaustion.
+  - Memory usable: Avg 97.72%, min 96.57% — healthy.
+  - Disk in use: Avg 8.48%, peak 8.69% — healthy.
+- **Logs**: Zero Datadog log entries returned for `san-w175-ha1-4-06` during the failure window. Docker daemon logs, `/var/log/syslog`, and application logs are not available via Datadog for this host.
+- **No Datadog alerts** referencing this Job ID, agent host, or Commander hosts were found or included in this analysis.
+
+### Splunk
+
+- **Primary source**: `index=ecommander` — all CloudBees job metadata, step details, agent state, Commander logs, and resource pool data retrieved successfully.
+- **Key finding**: Exit code 125 confirmed in step metadata. BuildInfoJson `failedReason=Compile` confirmed. Docker image, registry, and build command confirmed.
+- **Concurrent job on same agent**: `f1796d6a-8716-f16b-a5c2-4efb9ff91010` ran on `san-w175-ha1-4-06` concurrently. All its steps succeeded. No resource contention evidence.
+
+### External Dependency
+
+- **AWS ECR Registry** (`019415958841.dkr.ecr.us-west-2.amazonaws.com`): The Make step attempted to pull image `bsaas-tz/tz.xf.5.2:16.04.20260615.9`. Exit code 125 is consistent with an ECR authentication failure (expired token, missing IAM role, or network block to ECR endpoint). **No direct ECR-side telemetry is available** to confirm or deny a pull failure. This remains a candidate sub-cause.
+- **CRM DB** (`oil.qualcomm.com`, `aswproductiondatabase`): Referenced in environment variables. No evidence this was accessed during the Make step or contributed to the failure.
+- **Tiberium/PCM/CSDS URLs**: Referenced in environment variables. No evidence these were accessed during the Make step or contributed to the failure.
+
+---
+
+## # 7 Probable Root Cause
+
+**The Make step failed because `docker run` returned exit code 125, indicating the Docker daemon on agent `san-w175-ha1-4-06` was unable to start the container.**
+
+Exit code 125 is emitted by the Docker CLI when the `docker run` command itself fails before the container process begins. This is categorically different from a build failure inside the container (exit 1) or a missing command (exit 127). The three most probable sub-causes, in order of likelihood, are:
+
+1. **AWS ECR Image Pull Failure (Most Likely)** — The Make step uses `USE_SECRETS_MANAGER=true` and pulls from a private ECR registry. ECR authentication tokens expire every 12 hours. If the token on `san-w175-ha1-4-06` was expired or the Secrets Manager call failed, Docker would be unable to authenticate to ECR and `docker run` would return exit 125. All 5 retries failing persistently supports a credential/auth issue rather than a transient daemon hiccup.
+
+2. **Docker Daemon Error on Agent** — A crashed, hung, or misconfigured Docker daemon on `san-w175-ha1-4-06` would cause `docker run` to return exit 125. The agent itself remained alive (CloudBees agent process healthy), but the Docker daemon is a separate process. No Docker daemon logs are available via Datadog to confirm or deny this.
+
+3. **Volume Mount Failure** — The Make step uses multiple volume mounts (workspace, compile package directory, etc.). If a required mount point was unavailable or had permission issues, Docker would fail to start the container with exit 125. Disk utilization was healthy (8.48%), but a specific mount point failure would not be reflected in aggregate disk metrics.
+
+**Supporting Evidence:**
+- Exit code 125 confirmed in Splunk `index=ecommander` for Step ID `f1792e93-a5f7-f1fc-bfff-2686f9881e6f`
+- All 5 retries failed — persistent condition, not transient
+- Prior steps (Init, InitCredentialsAndServer) succeeded — agent was functional
+- Agent host resources (CPU, memory, disk) were healthy — not a resource exhaustion failure
+- Commander nodes were healthy — not a dispatch or orchestration failure
+- Concurrent job on same agent succeeded — not a systemic agent failure
+- Direct step log `Make.f1792e93-a5f7-f1fc-bfff-2686f9881e6f.log` was not accessible via available monitoring tools and must be examined to confirm the precise Docker error message
+
+---
+
+## # 8 Confidence Level
+
+### **MEDIUM**
+
+**Reason:**
+- **HIGH confidence** that the failure is a Docker-layer issue on `san-w175-ha1-4-06` — exit code 125 is unambiguous and directly evidenced in CloudBees step metadata.
+- **MEDIUM confidence** on the specific sub-cause (ECR pull vs. daemon error vs. volume mount) because:
+  - The step log file `Make.f1792e93-a5f7-f1fc-bfff-2686f9881e6f.log` was not retrievable via Splunk or Datadog — it must be read directly from the CloudBees log store.
+  - Datadog returned zero log entries for `san-w175-ha1-4-06` during the failure window — Docker daemon logs are unavailable.
+  - No ECR-side telemetry is available to confirm a pull failure.
+- Confidence cannot be elevated to HIGH without direct step log evidence confirming the Docker error message.
+
+---
+
+## # 9 Infrastructure vs. Code Assessment
+
+| Assessment | Result |
+|---|---|
+| **Infrastructure Issue** | **YES** |
+| **Code Issue** | **NO** |
+| **Mixed** | **NO** |
+
+**Reason:**
+The failure occurred at the Docker container launch layer — `docker run` returned exit 125 before the build script (`trustzone_images/build/ms/build_all.py`) or compiler was ever invoked. The build script, source code, and compiler were never reached. The `failedReason=Compile` in BuildInfoJson reflects the build phase classification (compile phase), not a compiler or code error. There is no evidence of compiler errors, syntax errors, missing symbols, or test failures. The failure is entirely in the infrastructure layer (Docker daemon / ECR authentication / container runtime) on the agent host.
+
+---
+
+## # 10 Recommended Remediation
+
+1. **Examine the step log immediately**
+   - Retrieve `Make.f1792e93-a5f7-f1fc-bfff-2686f9881e6f.log` from the CloudBees log store.
+   - Look for the exact Docker error message (e.g., `Error response from daemon`, `no basic auth credentials`, `pull access denied`, `cannot connect to the Docker daemon`).
+   - This single action will confirm the precise sub-cause.
+
+2. **If ECR authentication failure is confirmed:**
+   - Re-authenticate Docker to ECR on `san-w175-ha1-4-06`: `aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 019415958841.dkr.ecr.us-west-2.amazonaws.com`
+   - Verify `USE_SECRETS_MANAGER=true` is functioning correctly and the Secrets Manager endpoint is reachable from the agent.
+   - Check IAM role/instance profile attached to `san-w175-ha1-4-06` has `ecr:GetAuthorizationToken` and `ecr:BatchGetImage` permissions.
+
+3. **If Docker daemon failure is confirmed:**
+   - Check Docker daemon status on `san-w175-ha1-4-06`: `sudo systemctl status docker`
+   - Restart Docker daemon if crashed: `sudo systemctl restart docker`
+   - Review Docker daemon logs: `sudo journalctl -u docker --since "2026-07-06 11:30:00" --until "2026-07-06 12:05:00"`
+
+4. **If volume mount failure is confirmed:**
+   - Verify all required mount paths exist and are accessible under user `aswbldsv`.
+   - Check `/local/mnt/workspace/CRMBuilds/` mount health and permissions.
+
+5. **Retry the job** after confirming the Docker layer is functional on `san-w175-ha1-4-06`.
+
+---
+
+## # 11 Preventive Actions
+
+1. **Implement ECR token refresh automation**: ECR tokens expire every 12 hours. Implement a cron job or systemd timer on all CRM build agents to refresh ECR credentials every 6 hours. Alternatively, use the Amazon ECR Docker Credential Helper (`docker-credential-ecr-login`) to handle token refresh automatically.
+
+2. **Add Docker daemon health check to CloudBees pre-flight**: Add a pre-step to the `Build.Container.Rel` procedure that validates Docker daemon availability (`docker info`) and ECR connectivity before launching the Make step. Fail fast with a descriptive error rather than consuming 22 minutes of retries.
+
+3. **Enable Docker daemon log forwarding to Datadog/Splunk**: The absence of Docker daemon logs in both Datadog and Splunk significantly hampered this RCA. Configure the Docker daemon's logging driver to forward to a centralized log aggregator on all CRM build agents.
+
+4. **Alert on exit code 125 patterns**: Create a Splunk or Datadog alert that fires when CloudBees step exit code 125 is observed, enabling faster triage of Docker-layer failures.
+
+5. **Monitor ECR pull success rate**: Instrument ECR image pull attempts and failures as a metric. Alert when pull failure rate exceeds threshold for any agent host.
+
+6. **Periodic Docker daemon health monitoring**: Add Docker daemon process monitoring to Datadog for all CRM build agents to detect daemon crashes before they impact jobs.
+
+---
+
+## # 12 Sources Used
+
+| # | Source Type | Query Window | Evidence | Relevance |
+|---|---|---|---|---|
+| 1 | **Splunk** `index=ecommander` | Last 7 days | Job ID, job name, project, procedure, launched-by, run-as, workspace, start/finish, outcome, error message, failed step name/ID, exit code 125, agent host, Docker image/command, retry count, BuildInfoJson, Commander nodes, prior step outcomes | Primary source — all CloudBees job metadata |
+| 2 | **Splunk** `index=ecommander` (agent/Commander logs) | 2026-07-06T11:33:00Z – 12:05:00Z | Commander DEBUG logs confirming agent `san-w175-ha1-4-06` state=alive throughout; concurrent job `f1796d6a` on same agent with all steps succeeding; resource pool membership; Commander API response times healthy | Agent health, Commander health, concurrent job analysis |
+| 3 | **Datadog Metrics** (`system.cpu.user`, `system.mem.pct_usable`, `system.disk.in_use`) | 2026-07-06T11:33:00Z – 12:05:00Z | CPU avg 4.37% (peak 33.37%), memory usable avg 97.72% (min 96.57%), disk avg 8.48% (peak 8.69%) — no resource exhaustion | Agent host resource health during failure window |
+| 4 | **Datadog Hosts Inventory** | Current | `san-w175-ha1-4-06` confirmed present as GNU/Linux host | Confirmed agent host is monitored in Datadog |
+| 5 | **Datadog Logs** (`host:san-w175-ha1-4-06`) | 2026-07-06T11:33:00Z – 12:05:00Z | **Zero results** — no Docker daemon logs, syslog, or application logs available via Datadog for this host | Attempted; no findings — gap documented |
+| 6 | **CloudBees Step Log** `Make.f1792e93-a5f7-f1fc-bfff-2686f9881e6f.log` | N/A | **Not retrieved** — not accessible via Splunk or Datadog; must be examined directly in CloudBees log store | Required to confirm precise Docker error sub-cause |
+
+---
+
+> **⚠️ Critical Data Gap:** The CloudBees step execution log (`Make.f1792e93-a5f7-f1fc-bfff-2686f9881e6f.log`) and Docker daemon logs on `san-w175-ha1-4-06` were not accessible via available monitoring tools. The precise Docker error message (ECR pull failure, daemon error, or volume mount issue) cannot be determined from monitoring data alone. **These logs must be examined directly to confirm the root cause sub-category and close this RCA at HIGH confidence.**

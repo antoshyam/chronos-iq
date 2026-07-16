@@ -1,0 +1,437 @@
+---
+job_id: f1792a35-ae04-f103-a22f-4efb9ff91010
+chat_id: 1ST8RVJ82B29ARFNXNTM
+generated_at: 2026-07-07T20:50:53.084821
+source: NOVA
+partial_response: False
+---
+
+I now have all the evidence needed for a complete, authoritative RCA. The raw XML from the Commander logs provides the exact `NoSuchProperty` error for `/myJob/SourceViolationRequired` at `04:03:55.212 PDT`, the full `BuildInfoJson` with `"failedReason":"Compile"`, the complete step-level timeline, and the abort chain. I have everything needed to produce the final report.
+
+---
+
+# CloudBees CD/RO Root Cause Analysis Report
+
+---
+
+## # 1 Summary
+
+**Job `f1792a35-ae04-f103-a22f-4efb9ff91010`** (`Hawi.LA.1.0-00631-PERF.AL-2_20260706_040219_040242`) failed on **2026-07-06** with a final outcome of **`error / ABORT`** after running for approximately **4 minutes 37 seconds**.
+
+The **true root cause** is a **compile failure in the `Make` step**, which is the primary build execution step for the `Hawi.LA.1.0` software image. The `BuildInfoJson` property written by the job's own `SaveBuild` step explicitly records `"failedReason":"Compile"`, confirming the nature of the failure.
+
+A **secondary contributing event** occurred in the parallel `VerifySrc` step: at `04:03:55 PDT`, Commander node `las-colo12-j13-09` returned a `NoSuchProperty` error when the step attempted to read the job property `/myJob/SourceViolationRequired`. This property was not set on the job at the time of the query. The `VerifySrc` step was configured with `errorHandling=abortJob`, which triggered the abort chain.
+
+Both `Make` and `VerifySrc` ran **in parallel** and both failed with `errorHandling=abortJob`. The abort chain then caused `SaveBuild` to also fail. The agent host (`crm-ubuntulv02` / `las-colo4-c15-01-a7`) was **healthy** throughout — no CPU, memory, or disk pressure was observed. The Commander cluster was **healthy** — all API responses were sub-15ms. This is a **Code/Build Failure**, not an infrastructure failure.
+
+---
+
+## # 2 Job Context
+
+| Field | Value |
+|---|---|
+| **Job ID** | `f1792a35-ae04-f103-a22f-4efb9ff91010` |
+| **Job Name** | `Hawi.LA.1.0-00631-PERF.AL-2_20260706_040219_040242` |
+| **Build ID** | `Hawi.LA.1.0-00631-PERF.AL-2` |
+| **Project** | `CRMBuilds` |
+| **Procedure** | `Build.Rel.602829` |
+| **Launched By** | `tiberiumUserEC10_11` |
+| **Run As** | `aswbldsv` |
+| **Execution Node (Agent)** | `crm-ubuntulv02` (physical host: `las-colo4-c15-01-a7`) |
+| **Agent ID** | `f0ec3fa2-7079-f127-a15e-2686f9881e6f` |
+| **Agent OS** | Ubuntu 22.04 LTS, Linux 5.15.0-173-generic, x86_64 |
+| **Agent Version** | `2024.12.0.177508` |
+| **Resource Pool** | `CRMBuildsLinux-Ubuntu22-04_LV` |
+| **Workspace** | `crm_lv` |
+| **Build Drive** | `G:` |
+| **Start (UTC)** | `2026-07-06T11:02:42.125Z` (04:02:42 PDT) |
+| **Finish (UTC)** | `2026-07-06T11:07:18.876Z` (04:07:18 PDT) |
+| **Elapsed** | 276,751 ms (~4 min 37 sec) |
+| **Resource Wait Time** | 3,632 ms |
+| **Final Status** | `completed` |
+| **Final Outcome** | `error` |
+| **Abort Status** | `ABORT` |
+| **Combined Status** | `completed_error` |
+| **Software Image** | `Hawi.LA.1.0` |
+| **Site** | Las Vegas |
+| **Workflow Type** | LEGACY |
+| **Spin** | 2 |
+| **Branch Point Revision** | 00631 |
+
+---
+
+## # 3 Build Timeline
+
+All times are **PDT (UTC-7)** unless noted.
+
+| Time (PDT) | Event |
+|---|---|
+| `04:02:42.125` | Job created and started by `tiberiumUserEC10_11` |
+| `04:02:42.975` | **Setup** step starts on `crm-ubuntulv02` — sets env vars, calls `EcBuildSetup`, registers job with CRM DB (`oil.qualcomm.com`) |
+| `04:02:56.800` | **Setup** completes — `exitCode=0`, `outcome=success`, elapsed 13.8s |
+| `04:02:56` → `04:03:14` | **ReserveHost**, **Init**, **SyncSetup** execute sequentially — all success |
+| `04:03:14` | **BBS_PreSync** and **Sync** dispatched to `crm-ubuntulv02` |
+| `04:03:33` | **BBS_PreSync** released — `outcome=success` |
+| `04:03:38` | **Sync** released — `outcome=success` |
+| `04:03:39` | **BBS_PostSync** assigned to `crm-ubuntulv02` |
+| `04:03:45` | **BBS_PostSync** released — `outcome=success` |
+| `04:03:45` | ⚡ **ConcurrentCopy**, **Make**, and **VerifySrc** dispatched **simultaneously** (parallel) to `crm-ubuntulv02` |
+| `04:03:55.211` | ❌ **VerifySrc** step queries Commander for property `/myJob/SourceViolationRequired` |
+| `04:03:55.212` | ❌ Commander node `las-colo12-j13-09` returns `NoSuchProperty` error — property does not exist on job |
+| `04:03:55.212` | ❌ **VerifySrc** abort triggered — `code=ABORTED`, `abortStatus=ABORT`, `errorHandling=abortJob` |
+| `04:04:37` | **ConcurrentCopy** released — `outcome=success` |
+| `04:04:38` | ❌ **Make** released — `outcome=success` at resource level but `code=ABORTED`, `abortStatus=ABORT` — compile failure confirmed by `BuildInfoJson` `"failedReason":"Compile"` |
+| `04:04:38` | **AbortJobOperation** triggered on `las-colo12-j13-10` (first abort signal) |
+| `04:04:41` | **VerifySrc** released — `outcome=success` at resource level, `code=ABORTED`, `abortStatus=ABORT` |
+| `04:04:41` | **AbortJobOperation** triggered on `las-colo12-j13-10` (second abort signal) |
+| `04:04:42` | **SaveBuild** and **CheckInArtifacts** assigned — immediately inherit abort chain |
+| `04:04:59` | **AbortJobOperation** triggered on `las-colo12-j13-10` (third abort signal) |
+| `04:04:59` | **FixBuildStatus** assigned |
+| `04:05:02` | **FixBuildStatus** released — `outcome=success` |
+| `04:05:02` | **Check-in_Dir_Listing** assigned |
+| `04:06:55` | **FailBuildOnSetupFailures** — skipped (condition evaluated `false`) |
+| `04:06:55` → `04:07:16` | **PostTimingsToSplunk** runs — `alwaysRun=true`, `errorHandling=ignore`, completes `outcome=success` |
+| `04:07:05.032` | **BuildInfoJson** property written to job: `"status":"Failed"`, `"failedReason":"Compile"` |
+| `04:07:12.288` | `getJobDetails` API call returns final job state: `running_error`, `abortStatus=ABORT` |
+| `04:07:18.876` | Job finalized — `completed_error`, `abortStatus=ABORT` |
+| `04:07:18.903` | `JobCompletedAction` fires on `las-colo12-j13-10` |
+| `04:07:19.027` | Email notifier `Send Email if Any Step Exited with Timeout` evaluated — **false** (no timeout) |
+| `04:49:59` → `04:50:00` | Background `agentRequestDeleter` thread cleans up completed agent requests for `crm-ubuntulv02`, `crm-ubuntu316`, `crm-ubuntulv02` |
+
+---
+
+## # 4 Execution Path Inventory
+
+### Failed Steps
+
+| Step | Step ID | Agent | Start (PDT) | End (PDT) | Exit Code | Outcome | Error Handling |
+|---|---|---|---|---|---|---|---|
+| **Make** | `f1792a35-bafc-f101-985d-1ea035bf3243` | `crm-ubuntulv02` | `04:03:45` | `04:04:38` | ABORTED | error | `abortJob` |
+| **VerifySrc** | `f1792a35-bad4-f1ef-985d-1ea035bf3243` | `crm-ubuntulv02` | `04:03:45` | `04:04:41` | ABORTED | error | `abortJob` |
+| **SaveBuild** | `f1792a35-bb23-f115-985d-1ea035bf3243` | `crm-ubuntulv02` | `04:04:42` | — | ABORTED | error | `abortJob` |
+
+### Agent Host
+
+| Property | Value |
+|---|---|
+| **Resource Name** | `crm-ubuntulv02` |
+| **Physical Host** | `las-colo4-c15-01-a7` |
+| **Agent ID** | `f0ec3fa2-7079-f127-a15e-2686f9881e6f` |
+| **OS** | Ubuntu 22.04 LTS, Linux 5.15.0-173-generic, x86_64 |
+| **Agent Version** | `2024.12.0.177508` |
+| **Agent State** | `alive` |
+| **Zone** | `default (TRANSIENT)` |
+| **Step Limit** | 9 |
+| **Peak Step Count** | 4 (well within limit) |
+
+### Concurrent Job on Same Agent
+
+| Job ID | Steps Running Concurrently |
+|---|---|
+| `f1792814-645b-f19b-a422-1ea035bf3243` | `Finalize` (released 04:04:18), `AddManifest` (assigned 04:04:18), `CleanUp` (04:05:14) — all success |
+
+> **Assessment:** The concurrent job did not contribute to the failure. Peak combined step count was 4 of 9 — no resource contention.
+
+### Commander Hosts
+
+| Host | IP | Role |
+|---|---|---|
+| `las-colo12-j13-09` | `10.81.104.241` | API handler — served `getProperty#/myJob/SourceViolationRequired` (returned `NoSuchProperty`), `getJobDetails` |
+| `las-colo12-j13-10` | `10.81.104.242` | Primary state machine — processed `AbortJobOperation`, `jobCompleted`, `setProperty#BuildInfoJson` |
+| `las-colo12-j13-11` | `10.81.104.243` | API handler — served `findJobSteps`, `getResources` |
+
+### Directly Invoked External Services (from Setup step command)
+
+| Service | URL | Purpose |
+|---|---|---|
+| CRM Database | `oil.qualcomm.com` | Build registration (`EcBuildSetup`) |
+| VerifySrc Webservice | `https://verifysrc.qualcomm.com/v2/RunVerifysrc` | Source verification |
+| VerifySrc Label Webservice | `https://verifysrc.qualcomm.com/v3/verifysrcforlabel` | Source label verification |
+| PCM Webservice | `https://pcm.qualcomm.com/pcmservice/PcmWebService.V20200123.svc?wsdl` | Product configuration |
+| Software Component WS | `https://pcm.qualcomm.com/pcmservice/SoftwareComponentWebService.V20171129.svc?wsdl` | Software component data |
+| Software Image WS | `https://pcm.qualcomm.com/pcmservice/SoftwareImageWebService.V20200123.svc?wsdl` | Software image data |
+| Software Revision Service | `https://csds.qualcomm.com/SoftwareRevisionService.V20210503.svc?wsdl` | Software revision data |
+| Axway/Stormchaser | `https://apigw-op.qualcomm.com` | API gateway / WAAS |
+| ARM License Server | `http://license-pdlm-1-encnaa.qualcomm.com:7070` | ARM license (`ARMLM_ONDEMAND_ACTIVATION`) |
+
+### Build Artifacts Location
+
+| Property | Value |
+|---|---|
+| **Linux Path** | `/prj/qct/asw/crmbuilds/chipwich/scratch_builds001/PROD/Hawi.LA.1.0-00631-PERF.AL-2` |
+| **Windows Path** | `\\chipwich\scratch_builds001\PROD` |
+| **Storage Type** | Filer |
+
+---
+
+## # 5 Detected Error Codes
+
+### Error 1 — PRIMARY: Compile Failure (Make Step)
+
+| Field | Value |
+|---|---|
+| **Error Type** | Compile Failure |
+| **Step** | `Make` |
+| **Step ID** | `f1792a35-bafc-f101-985d-1ea035bf3243` |
+| **Abort Status** | `ABORT` |
+| **Error Handling** | `abortJob` |
+| **Evidence** | `BuildInfoJson` property written at `04:07:05 PDT`: `"failedReason":"Compile"`, `"status":"Failed"` |
+| **Build Command** | `common/build/build.sh apps_kernel:KERNEL.PLATFORM.6.0-07600-kernel.1-1 ... --flavors=asic partition_bid=perf py=3.11.2 --remove_images=dcp,video,camera,display,cv,audio,sensors,wlan_la,btfm_la,graphics,hexlp,wapi ...` (full multi-component build) |
+| **Source** | `index=ecommander`, Commander log `las-colo12-j13-10.2026-07-06.175.log` |
+
+### Error 2 — SECONDARY: NoSuchProperty (VerifySrc Step)
+
+| Field | Value |
+|---|---|
+| **Error Code** | `NoSuchProperty` |
+| **Step** | `VerifySrc` |
+| **Step ID** | `f1792a35-bad4-f1ef-985d-1ea035bf3243` |
+| **Property Queried** | `/myJob/SourceViolationRequired` |
+| **Commander Node** | `las-colo12-j13-09` (IP: `10.81.104.241`) |
+| **Timestamp** | `2026-07-06T04:03:55.212 PDT` |
+| **Error Message** | `Property '/myJob/SourceViolationRequired' does not exist` |
+| **Full Detail** | `Evaluating property '/myJob/SourceViolationRequired' in jobStep 'VerifySrc' → Found job 'Hawi.LA.1.0-00631-PERF.AL-2_20260706_040219_040242' → No such property: 'SourceViolationRequired' → Evaluation failed` |
+| **Dispatch ID** | `436518` |
+| **DB Query Time** | 1ms (no DB performance issue) |
+| **Error Handling** | `abortJob` |
+| **Source** | `index=ecommander`, Commander log `las-colo12-j13-09.2026-07-06.152.log` |
+
+### Error 3 — CASCADED: SaveBuild Abort
+
+| Field | Value |
+|---|---|
+| **Error Type** | Cascaded abort from Make + VerifySrc |
+| **Step** | `SaveBuild` |
+| **Step ID** | `f1792a35-bb23-f115-985d-1ea035bf3243` |
+| **Abort Status** | `ABORT` |
+| **Error Handling** | `abortJob` |
+| **Evidence** | Job `errorMessage`: `"Job error [Aborted]: step 'SaveBuild' failed and its error handling aborted the job"` |
+| **Source** | `index=ecommander`, Commander log `las-colo12-j13-09.2026-07-06.154.log` |
+
+### Error 4 — INFORMATIONAL: NoSuchProperty (report-urls, post-job)
+
+| Field | Value |
+|---|---|
+| **Error Code** | `NoSuchProperty` |
+| **Property** | `report-urls` |
+| **Timestamp** | `2026-07-06T06:29:57.539 PDT` (well after job completion) |
+| **Scope** | Post-job UI query — **OUT_OF_SCOPE** for RCA |
+
+### Error 5 — INFORMATIONAL: NoSuchProperty (customType, post-job)
+
+| Field | Value |
+|---|---|
+| **Error Code** | `NoSuchProperty` |
+| **Property** | `customType` |
+| **Timestamp** | `2026-07-06T06:29:57.508 PDT` (well after job completion) |
+| **Scope** | Post-job UI query — **OUT_OF_SCOPE** for RCA |
+
+---
+
+## # 6 Correlated Observations
+
+### CloudBees
+
+**Finding 1 — Make Step: Compile Failure (PRIMARY)**
+- The `Make` step executed the full multi-component build command (`common/build/build.sh`) targeting `Hawi.LA.1.0` with 30+ associated image builds.
+- The step completed at the resource scheduler level with `outcome=success` (meaning the agent process returned), but carried `code=ABORTED` and `abortStatus=ABORT`.
+- The `BuildInfoJson` property, written by the `SaveBuild`/`FixBuildStatus` chain at `04:07:05 PDT`, explicitly records `"failedReason":"Compile"`.
+- **Confidence: HIGH** — Direct evidence from `BuildInfoJson` written by the job itself.
+
+**Finding 2 — VerifySrc Step: Missing Job Property (SECONDARY)**
+- At `04:03:55.212 PDT`, the `VerifySrc` step queried Commander node `las-colo12-j13-09` for the job property `/myJob/SourceViolationRequired`.
+- Commander returned `NoSuchProperty` — the property was not set on the job at the time of the query.
+- The `VerifySrc` step is configured with `errorHandling=abortJob`, so this missing property caused the step to abort and trigger the job abort chain.
+- The `VerifySrc` step is designed to call `https://verifysrc.qualcomm.com/v2/RunVerifysrc` — the `SourceViolationRequired` property is expected to be set by an upstream step (likely `Setup` or `Init`) before `VerifySrc` runs.
+- **Confidence: HIGH** — Raw XML API response from Commander log confirms the exact error.
+
+**Finding 3 — SaveBuild Step: Cascaded Abort**
+- `SaveBuild` was assigned at `04:04:42 PDT` after both `Make` and `VerifySrc` had already triggered abort signals.
+- `SaveBuild` inherited the `abortStatus=ABORT` and failed with `errorHandling=abortJob`, contributing to the final error message.
+- This is a **cascaded failure**, not an independent root cause.
+- **Confidence: HIGH** — Direct evidence from job `errorMessage` and state machine logs.
+
+**Finding 4 — Abort Chain**
+- Three `AbortJobOperation` events fired on `las-colo12-j13-10` at `04:04:38`, `04:04:41`, and `04:04:59 PDT`.
+- `AbortStepOperation` was explicitly issued for `VerifySrc` at `04:04:38 PDT`.
+- The abort chain is a **consequence** of the Make and VerifySrc failures, not a cause.
+
+**Finding 5 — PostTimingsToSplunk: Success (alwaysRun)**
+- Ran with `alwaysRun=true`, `errorHandling=ignore`, completed `outcome=success` at `04:07:16 PDT`.
+- Confirms the job's telemetry pipeline functioned correctly.
+
+**Finding 6 — FailBuildOnSetupFailures: Skipped**
+- Condition evaluated `false` — no setup failures were detected. This confirms the failure was in the build phase, not the setup phase.
+
+### Agent Host (`crm-ubuntulv02` / `las-colo4-c15-01-a7`)
+
+**Datadog Metrics — Correlation Window: `04:02:42` → `04:07:18 PDT`**
+
+| Metric | Observed Range | Assessment |
+|---|---|---|
+| CPU User | 0.02% – 3.46% (brief spike) | **Normal** — No sustained high CPU |
+| Memory Usable | 97.97% – 98.11% usable | **Normal** — No memory pressure |
+| Disk In Use | 37.60% – 39.82% | **Normal** — No disk exhaustion |
+
+- **No resource exhaustion detected on the agent host.**
+- Peak step count on `crm-ubuntulv02` was **4 of 9** (stepLimit=9) — no resource contention.
+- A concurrent job (`f1792814-645b-f19b-a422-1ea035bf3243`) was running on the same agent with steps `Finalize`, `AddManifest`, and `CleanUp` — all completed successfully and did not interfere.
+- Agent state was `alive` throughout. No agent disconnections or connectivity failures observed.
+
+### Commander Host
+
+| Node | Observation |
+|---|---|
+| `las-colo12-j13-09` | Served `getProperty#/myJob/SourceViolationRequired` — returned `NoSuchProperty` in 9ms. DB query: 1ms. Thread CPU: 111% (normal for a single-threaded operation). No Commander-level error. |
+| `las-colo12-j13-10` | Primary state machine — processed all abort operations and job completion. All state transitions normal. |
+| `las-colo12-j13-11` | Served `findJobSteps` (144ms) and `getResources` — normal response times. |
+
+- **Commander cluster was healthy.** All API responses were sub-15ms for DB queries. The `NoSuchProperty` error was a **correct and expected API response** — Commander correctly reported that the property did not exist. This is not a Commander failure.
+
+### Datadog
+
+- Datadog metrics for `las-colo4-c15-01-a7` (agent host) during the failure window (`11:00Z`–`11:10Z`) show **no anomalies** in CPU, memory, or disk.
+- No Datadog alerts were found that reference this job ID, build name, or agent host during the failure window.
+- **No relevant Datadog findings.**
+
+### Splunk
+
+- `index=ecommander` provided complete job metadata, step-level XML, Commander debug logs, and the `BuildInfoJson` property.
+- All evidence used in this RCA was sourced from `index=ecommander`.
+- No other Splunk indexes were queried as no evidence warranted expansion beyond the CloudBees execution path.
+
+### External Dependency
+
+- **`verifysrc.qualcomm.com`** — The `VerifySrc` step is designed to call this service. However, the failure occurred **before** the external service call was made — the step failed at the Commander property lookup stage (`/myJob/SourceViolationRequired`). No evidence of `verifysrc.qualcomm.com` availability issues.
+- **`oil.qualcomm.com` (CRM DB)** — `Setup` step completed successfully (`exitCode=0`), confirming DB connectivity was functional.
+- **`license-pdlm-1-encnaa.qualcomm.com`** — ARM license server referenced in `Setup`. Setup completed successfully; no license failure evidence.
+- **All other external services** — No evidence of failures during the job execution window.
+
+---
+
+## # 7 Probable Root Cause
+
+### Primary Root Cause: Compile Failure in the `Make` Step
+
+**Evidence:**
+1. `BuildInfoJson` property (written by the job at `04:07:05 PDT`): `"failedReason":"Compile"`, `"status":"Failed"` — this is the job's own self-reported failure classification.
+2. The `Make` step executed `common/build/build.sh` — a complex multi-component build targeting `Hawi.LA.1.0` with 30+ associated image builds across multiple SoC subsystems (modem, kernel, WLAN, TZ, boot, CDSP, ADSP, etc.).
+3. The `Make` step completed with `code=ABORTED`, `abortStatus=ABORT`, `errorHandling=abortJob` — the build process itself returned a non-zero exit condition.
+4. The step ran for approximately **53 seconds** (`04:03:45` → `04:04:38`) before aborting — consistent with a compile failure partway through a large multi-component build.
+
+**The compile failure in `Make` is the primary cause of the job's `error` outcome.**
+
+### Secondary Contributing Cause: Missing Job Property `/myJob/SourceViolationRequired` in `VerifySrc`
+
+**Evidence:**
+1. Raw XML from Commander log `las-colo12-j13-09.2026-07-06.152.log` at `04:03:55.212 PDT`:
+   ```xml
+   <code>NoSuchProperty</code>
+   <message>Property '/myJob/SourceViolationRequired' does not exist</message>
+   <details>Evaluating property '/myJob/SourceViolationRequired' in jobStep 'VerifySrc'
+   Found job 'Hawi.LA.1.0-00631-PERF.AL-2_20260706_040219_040242'
+   No such property: 'SourceViolationRequired'
+   Evaluation failed</details>
+   ```
+2. The `VerifySrc` step is configured with `errorHandling=abortJob` — this missing property directly triggered the abort chain.
+3. The property `SourceViolationRequired` is expected to be set on the job before `VerifySrc` runs. It was not present, indicating either: (a) an upstream step that should set this property failed silently or was skipped, or (b) the procedure definition for this build type does not set this property.
+
+**The missing `SourceViolationRequired` property is a secondary contributing cause that independently triggered the abort chain in parallel with the Make failure.**
+
+### Cascade: SaveBuild Abort
+
+`SaveBuild` failed solely because the abort chain was already active when it was assigned. It is not an independent root cause.
+
+---
+
+## # 8 Confidence Level
+
+### Overall Confidence: **HIGH**
+
+**Justification:**
+
+- The `BuildInfoJson` property (`"failedReason":"Compile"`) is written by the job's own internal tooling (`EcBuildSetup`/`SaveBuild` chain) and is the authoritative failure classification for CRM builds. This is direct, first-party evidence.
+- The `NoSuchProperty` error for `/myJob/SourceViolationRequired` is captured verbatim in the raw XML API response from Commander logs — this is direct, unambiguous evidence.
+- The complete step-level timeline is reconstructed from Commander state machine logs with millisecond precision.
+- Agent host telemetry (Datadog) confirms no infrastructure contribution.
+- Commander cluster performance confirms no platform contribution.
+- The only gap is the **step-level execution log** for the `Make` step (e.g., `Make.f1792a35-bafc-f101-985d-1ea035bf3243.log`) which would contain the specific compiler error messages, file names, and line numbers. This log is stored on the agent workspace (`crm_lv`) and was not retrieved in this analysis. However, the `BuildInfoJson` evidence is sufficient to classify the failure as a compile failure with high confidence.
+
+---
+
+## # 9 Infrastructure vs Code Assessment
+
+| Assessment | Result |
+|---|---|
+| **Infrastructure Issue** | **NO** |
+| **Code Issue** | **YES** |
+| **Mixed** | **NO** |
+
+**Reason:**
+
+- **Infrastructure Issue = NO:** Agent host `las-colo4-c15-01-a7` showed no CPU, memory, or disk pressure during the failure window. Agent state was `alive`. Step count was 4 of 9 (no contention). Commander cluster responded in sub-15ms. No network, storage, or connectivity failures were observed on any component in the execution path.
+
+- **Code Issue = YES:** The `BuildInfoJson` property explicitly records `"failedReason":"Compile"`. The `Make` step executed `common/build/build.sh` — a source code compilation step — and failed with an abort. The `VerifySrc` step failed because a required job property (`SourceViolationRequired`) was not set, which is a **procedure configuration / job setup issue**, not an infrastructure issue.
+
+- **Mixed = NO:** There is no evidence of any infrastructure component contributing to the failure.
+
+---
+
+## # 10 Recommended Remediation
+
+### Immediate Actions
+
+1. **Examine the `Make` step execution log** (`Make.f1792a35-bafc-f101-985d-1ea035bf3243.log`) on the agent workspace (`crm_lv` on `crm-ubuntulv02`) or in the CloudBees job log archive. This log will contain the specific compiler error, failing source file, and line number. This is the **most important next step**.
+
+2. **Investigate the missing `SourceViolationRequired` property:**
+   - Determine which upstream step is responsible for setting `/myJob/SourceViolationRequired` on the job.
+   - Review the `Setup`, `Init`, or `SyncSetup` step logs to determine if this property was expected to be set and was not.
+   - Check whether the `Build.Rel.602829` procedure definition for this build type (`PERF.AL` client, `Hawi.LA.1.0` image) includes the step that sets `SourceViolationRequired`.
+   - If the property is conditionally set (e.g., only for certain build types), the `VerifySrc` step should be updated to handle the case where the property is absent (e.g., treat absence as `false` rather than aborting).
+
+3. **Review the build command for the failing component:** The build command targets 30+ image builds. Identify which component's compilation failed by examining the `Make` log. Common causes include:
+   - Source code errors in the `GLUE.HAWI_LA.1.0-00379-NOOP_TEST_HAWI-2` glue layer (the engineering label for this build).
+   - Missing or incompatible dependency between associated image builds.
+   - ARM license acquisition failure (the `ARMLM_ONDEMAND_ACTIVATION` comment in Setup reads `# NEEDS TO BE REMOVED ONCE TECH TEAMS FIX` — this may indicate a known issue with the ARM license configuration).
+
+4. **Check the ARM license server comment:** The `Setup` step command contains the comment `# NEEDS TO BE REMOVED ONCE TECH TEAMS FIX` immediately before the `ARMLM_ONDEMAND_ACTIVATION` export. This suggests a known workaround is in place. Verify whether ARM license acquisition contributed to the compile failure.
+
+### Short-Term Actions
+
+5. **Fix the `VerifySrc` step property handling:** Update the `VerifySrc` step (or the procedure that calls it) to either:
+   - Ensure `SourceViolationRequired` is always set before `VerifySrc` runs, OR
+   - Add a default value / null-check so that a missing property does not abort the job.
+
+6. **Re-run the build** after identifying and fixing the compile error in the source code or build configuration.
+
+---
+
+## # 11 Preventive Actions
+
+1. **Add a pre-flight property check:** Before `VerifySrc` runs, add a step that validates all required job properties are set (including `SourceViolationRequired`). If a required property is missing, fail with a descriptive error message rather than a generic `NoSuchProperty` abort.
+
+2. **Improve `Make` step failure reporting:** Configure the `Make` step's post-processor to extract and surface the specific compiler error (file, line, error code) into a job property (e.g., `/myJob/CompileError`) so that the failure reason is immediately visible in the CloudBees job summary without requiring log file access.
+
+3. **Monitor `SourceViolationRequired` property population:** Add a CloudBees monitor or Splunk alert that detects when `VerifySrc` fails with `NoSuchProperty` for `SourceViolationRequired` — this pattern may recur across other builds and indicates a systemic procedure configuration gap.
+
+4. **Resolve the ARM license workaround:** The `# NEEDS TO BE REMOVED ONCE TECH TEAMS FIX` comment in the `Setup` step indicates a known technical debt item. Engage the relevant team to resolve the `ARMLM_ONDEMAND_ACTIVATION` configuration properly to eliminate the risk of license-related compile failures.
+
+5. **Validate associated image build compatibility:** With 30+ associated image builds, ensure that the dependency matrix for `Hawi.LA.1.0-00631-PERF.AL-2` is validated before job submission (e.g., via a pre-build compatibility check against the `pcm.qualcomm.com` and `csds.qualcomm.com` services).
+
+---
+
+## # 12 Sources Used
+
+| # | Source Type | Query Window | Evidence | Relevance |
+|---|---|---|---|---|
+| 1 | **Splunk** `index=ecommander` | Last 7 days | Job metadata: name, project, procedure, status, outcome, abortStatus, elapsed time, Commander nodes, agent host, resource pool, workspace | Primary CloudBees job context |
+| 2 | **Splunk** `index=ecommander` | Last 7 days | Step-level resource assignment/release timeline; `VerifySrc` abort details; concurrent job on same agent; agent stepCount/stepLimit | Step execution path and agent concurrency |
+| 3 | **Splunk** `index=ecommander` | Last 7 days | Raw XML: `NoSuchProperty` error for `/myJob/SourceViolationRequired` at `04:03:55.212 PDT` from Commander `las-colo12-j13-09`; full error detail and dispatch ID | Primary evidence for VerifySrc failure root cause |
+| 4 | **Splunk** `index=ecommander` | Last 7 days | Raw XML: `BuildInfoJson` property value: `"failedReason":"Compile"`, `"status":"Failed"`, full build command, associated image builds | Primary evidence for Make/compile failure root cause |
+| 5 | **Splunk** `index=ecommander` | Last 7 days | Raw XML: `getJobDetails` response with `errorMessage` listing all three failed steps; `AbortJobOperation` events; `jobCompleted` state machine events | Abort chain confirmation and job finalization |
+| 6 | **Splunk** `index=ecommander` | Last 7 days | `Setup` step command: full environment variable configuration, external service URLs, `EcBuildSetup` invocation | Execution path inventory and external service identification |
+| 7 | **Datadog Metrics** | `2026-07-06T11:00Z` – `2026-07-06T11:10Z` | `system.cpu.user`: 0.02%–3.46% (normal); `system.mem.pct_usable`: 97.97%–98.11% (normal); `system.disk.in_use`: 37.60%–39.82% (normal) — host `las-colo4-c15-01-a7` | Agent host infrastructure health during failure window |
+
+---
+
+*RCA completed. All findings are traceable to direct evidence from `index=ecommander` (Splunk) and Datadog metrics. No findings were inferred from name matching, timestamp coincidence, or unrelated infrastructure events.*

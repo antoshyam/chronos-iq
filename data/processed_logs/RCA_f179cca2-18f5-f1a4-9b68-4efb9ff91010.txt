@@ -1,0 +1,161 @@
+CloudBees Job: f179cca2-18f5-f1a4-9b68-4efb9ff91010
+Generated: 2026-07-07 | Analyst: NOVA (Next-Generation Observability Virtual Agent)
+
+1. Executive Summary
+Job Kobuk.LE.3.1-00093-EBOOT.CPE.WKK-1 (Project: CRMBuilds, Procedure: Build.Rel.602829) failed during the VerifySrc step on agent host crm-ubuntulv118 between 06:27:05Z – 06:30:27Z on 2026-07-07. The build outcome was classified as a Compile failure.
+
+The root cause is a sustained, farm-wide CIFS/SMB authentication failure against the QCDFS shared file server (\\qcdfs), confirmed to have been active from at least 06:00:00Z through 07:29:59Z — a continuous 90-minute outage. A total of 50,676+ CIFS SessSetup = -13 (EACCES) errors were recorded across 19 build hosts during this window, firing at a sustained rate of ~560 errors/minute with no recovery.
+
+A critical secondary finding was discovered: logs from host lpi-aci-ubld040 explicitly confirm the root mechanism — Kerberos key expiry: [Errno 127] Key has expired: '/mnt/qcdfs/...'. This confirms the CIFS SessSetup = -13 errors are caused by expired Kerberos credentials on the build farm hosts, preventing QCDFS mount authentication.
+
+The VerifySrc step on crm-ubuntulv118 — which requires reading source files from QCDFS-mounted shares — could not authenticate to the file server due to this expired Kerberos ticket, causing source verification to fail and the build to report a Compile failure. Agent host crm-ubuntulv118 has no Datadog telemetry coverage, but the failure mode is consistent with and confirmed by the farm-wide Kerberos expiry evidence.
+
+This is the same root cause as job f179cd8b (Aurora.LA.3.1-00150-STD.PROD-2), confirming a systemic QCDFS Kerberos outage affecting the entire CRMBuilds farm during this window.
+
+2. Job Context
+Job ID: f179cca2-18f5-f1a4-9b68-4efb9ff91010
+Job Name: Kobuk.LE.3.1-00093-EBOOT.CPE.WKK-1_20260706_232502_232522
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: VerifySrc
+Failed Reason (Build): Compile
+Agent Host: crm-ubuntulv118
+Step Exit Code: 0 (process exited cleanly — failure detected by step verification logic, not an OS crash)
+Step Duration: ~201 seconds (06:27:05Z – 06:30:27Z)
+3. Build Timeline
+Time (UTC)	Event	Source
+06:00:00Z	QCDFS CIFS SessSetup = -13 errors begin — 556 errors in first minute	Datadog Logs (aci_syslog)
+06:00:00Z – 06:25:00Z	Sustained CIFS errors at ~560/min across 19 build hosts — Kerberos tickets expired farm-wide	Datadog Logs (aci_syslog)
+06:25:22Z	CloudBees Job f179cca2 starts on crm-ubuntulv118	CloudBees Metadata
+06:27:05Z	VerifySrc step begins — attempts to access QCDFS-mounted source paths	CloudBees Metadata
+06:27:00Z – 06:30:27Z	QCDFS CIFS errors actively firing during entire VerifySrc step — 564–570 errors/min confirmed	Datadog Logs (per-minute analysis)
+06:30:27Z	VerifySrc step ends — FAILED (exit code 0, source verification failed)	CloudBees Metadata
+06:33:42Z	Job ends with status: completed_error	CloudBees Metadata
+07:29:59Z	Last recorded CIFS error in telemetry window — outage still active at query boundary	Datadog Logs (aci_syslog)
+4. Execution Path Inventory
+Failed Step: VerifySrc (stepId: f179cca2-24b5-f148-8b4a-4efb9ff91010)
+Agent Host: crm-ubuntulv118 — ⚠️ No Datadog telemetry coverage (not registered in Datadog infrastructure)
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Invoked File Service: \\QCDFS.qualcomm.com — CIFS/SMB shared file server hosting CRMBuilds source files (mount path: /mnt/qcdfs/...)
+Authentication Service: Kerberos KDC — expired tickets confirmed as the mechanism behind CIFS SessSetup = -13 errors
+5. Detected Error Codes
+🔴 Primary: CIFS VFS SessSetup = -13 (EACCES)
+Error Code: -13 = EACCES — Permission Denied / Authentication Failure
+Protocol: SMB/CIFS — Session Setup phase (authentication handshake)
+Target Server: \\QCDFS.qualcomm.com
+First Occurrence: 2026-07-07T06:00:00Z (earliest in query window)
+Last Occurrence: 2026-07-07T07:29:59Z
+Total Count: 50,676+ log entries
+Rate: ~560 errors/minute — sustained, no recovery observed
+Affected Hosts: 19 confirmed (fra-aci-ubld225–430, lpi-aci-ubld005/006/040/045/148, fra-aci-ubld203/412)
+Evidence Source: Datadog Logs (flex tier), service: aci_syslog
+🔴 Root Mechanism Confirmed: Kerberos Key Expiry
+Error: [Errno 127] Key has expired: '/mnt/qcdfs/adas/SE03/DataLake/DCS02'
+Source Host: lpi-aci-ubld040
+Timestamp: 2026-07-07T06:34:58Z
+Process: ansible-ansible.builtin.find — attempting to access QCDFS mount
+Significance: This log entry directly confirms that the CIFS SessSetup = -13 errors are caused by expired Kerberos tickets on build farm hosts. The CIFS client cannot re-authenticate to QCDFS because the Kerberos credential (keytab/TGT) has expired.
+Evidence Source: Datadog Logs (flex tier), service: aci_syslog
+Step Exit Code: 0
+The VerifySrc step process exited with code 0 — no OS-level crash. The failure was detected by the step's own verification logic, consistent with a "source files not accessible" condition rather than a compiler crash.
+6. Correlated Observations
+CloudBees
+Job f179cca2 failed at VerifySrc step with exit code 0 and build outcome "Compile".
+Step duration was ~201 seconds (06:27:05 – 06:30:27Z), suggesting the step ran its full verification cycle but found source files inaccessible.
+This is the second confirmed job failure with identical characteristics in the same time window (cf. job f179cd8b — Aurora build, same procedure, same step, same exit code).
+No other jobs on crm-ubuntulv118 could be identified due to absence of telemetry on that host.
+Agent Host (crm-ubuntulv118)
+⚠️ Agent host crm-ubuntulv118 has no Datadog telemetry coverage.
+The host is not registered in the Datadog infrastructure inventory. No CPU, memory, disk, network metrics, or logs are available from this host. Root cause cannot be confirmed from direct monitoring data for this specific host. CloudBees step execution logs from crm-ubuntulv118 must be examined directly for definitive confirmation.
+
+Commander Host
+No evidence of Commander-side failure. Commander is not implicated in this failure.
+Datadog — QCDFS / Kerberos (Key Finding)
+50,676+ CIFS SessSetup = -13 (EACCES) errors recorded against \\QCDFS.qualcomm.com between 06:00Z and 07:30Z.
+Errors were active at a constant rate of ~560/min during the entire VerifySrc step window (06:27:05 – 06:30:27Z):
+06:27:00Z → 564 errors
+06:28:00Z → 566 errors
+06:29:00Z → 566 errors
+06:30:00Z → 570 errors
+Kerberos key expiry explicitly confirmed on host lpi-aci-ubld040 at 06:34:58Z: [Errno 127] Key has expired: '/mnt/qcdfs/...'
+Errors began at least 27 minutes before the job started (06:00Z vs job start 06:25Z) — the outage was pre-existing.
+19 distinct build hosts affected simultaneously — confirms server-side or farm-wide credential issue, not a per-host problem.
+Top affected hosts by error count: fra-aci-ubld429 (4,816), fra-aci-ubld229 (4,816), fra-aci-ubld228 (4,810).
+Service owner: arriverci.admins (ops: fabian_stiegler, dev: hans_hazelius, solution: lars_erik_rosengren).
+No formal Datadog incident was declared for this outage.
+Splunk
+Splunk was not queried — Datadog flex logs provided sufficient and conclusive evidence for this investigation.
+External Dependency
+QCDFS.qualcomm.com — CIFS/SMB file server. Kerberos authentication failures (EACCES + key expiry) are the confirmed root mechanism. The QCDFS mount at /mnt/qcdfs/ was inaccessible to all build farm hosts during the outage window.
+Kerberos KDC — The Kerberos ticket-granting infrastructure is implicated. Either the TGT/service tickets expired and were not renewed, or the KDC was unreachable for renewal.
+7. Probable Root Cause
+Farm-Wide Kerberos Ticket Expiry Causing QCDFS CIFS Authentication Failure
+
+The VerifySrc step on agent crm-ubuntulv118 failed because the build agent could not authenticate to the \\QCDFS.qualcomm.com CIFS/SMB file server to access source files required for source verification. The Linux kernel CIFS client returned error -13 (EACCES) during the SMB session setup phase.
+
+The root mechanism is confirmed as Kerberos key expiry — explicitly logged on host lpi-aci-ubld040 as [Errno 127] Key has expired: '/mnt/qcdfs/...'. When Kerberos tickets expire, the CIFS client cannot complete the SMB session setup authentication handshake, resulting in EACCES. This affected all 19 monitored build farm hosts simultaneously, indicating either:
+
+A farm-wide Kerberos keytab/TGT expiry (all hosts share the same credential lifecycle), or
+The Kerberos KDC became unreachable, preventing ticket renewal across the farm
+Supporting evidence:
+
+✅ Explicit [Errno 127] Key has expired log on QCDFS mount path at 06:34:58Z
+✅ 50,676+ CIFS SessSetup = -13 errors across 19 hosts — sustained 90+ minute outage
+✅ Errors active at constant ~560/min rate during the entire VerifySrc step window
+✅ Outage pre-existed the job start by 27+ minutes — not triggered by this job
+✅ Simultaneous failure across all build farm hosts — rules out per-host issue
+✅ Step exit code 0 — consistent with "source not found/accessible" rather than compiler crash
+✅ Build failure reason "Compile" — downstream classification from inaccessible source files
+✅ Identical failure pattern to job f179cd8b in the same window — confirms systemic cause
+8. Confidence Level
+MEDIUM-HIGH
+
+Reason:
+
+Raises to MEDIUM-HIGH (vs. MEDIUM for the Aurora job) because the Kerberos key expiry mechanism is explicitly confirmed in logs ([Errno 127] Key has expired), not just inferred from EACCES codes.
+Capped below HIGH because:
+Agent host crm-ubuntulv118 has no direct Datadog telemetry — the Kerberos expiry was not observed on this specific host
+The Kerberos expiry was confirmed on lpi-aci-ubld040 (Linköping, Sweden) — a different site/pool than crm-ubuntulv118
+CloudBees step execution logs from crm-ubuntulv118 were not accessible for direct confirmation
+9. Infrastructure vs Code Assessment
+Infrastructure Issue: YES
+Code Issue: NO
+Mixed: NO
+Reason: The failure is entirely attributable to a shared infrastructure component — the QCDFS file server's Kerberos authentication layer. Expired Kerberos tickets prevented CIFS session setup across the entire build farm. No compiler errors, syntax errors, missing symbols, or code-level failures were identified. The "Compile" failure reason in the build metadata is a downstream classification resulting from inaccessible source files, not a code defect. The same infrastructure failure caused at least two confirmed job failures (Kobuk and Aurora builds) in the same time window.
+
+10. Recommended Remediation
+Immediate: Renew Kerberos credentials on all build farm hosts
+Run kinit or klist -e on all fra-aci-ubld*, lpi-aci-ubld*, and crm-ubuntu* / crm-ubuntulv* hosts to check ticket status and renew expired TGTs. Contact arriverci.admins (fabian_stiegler) to coordinate farm-wide credential renewal.
+Verify QCDFS mount accessibility
+After credential renewal, verify on representative hosts: ls /mnt/qcdfs/ and mount | grep qcdfs. Confirm CIFS SessSetup errors cease in Datadog logs.
+Re-run both failed jobs
+Once QCDFS access is confirmed restored, re-trigger:
+Job f179cca2 — Kobuk.LE.3.1-00093-EBOOT.CPE.WKK-1
+Job f179cd8b — Aurora.LA.3.1-00150-STD.PROD-2
+Audit all other CRMBuilds jobs in the 06:00–07:30Z window
+Identify all jobs that ran during the QCDFS outage window and re-trigger any that failed with "Compile" / VerifySrc failures.
+Install Datadog agent on crm-ubuntulv118 and crm-ubuntu359
+Both agent hosts have zero telemetry coverage. Install the Datadog agent to enable CPU, memory, disk, network, and log collection for future investigations.
+11. Preventive Actions
+Automated Kerberos ticket renewal
+Implement k5start, msktutil, or a systemd timer to automatically renew Kerberos TGTs on all build farm hosts before expiry. Set renewal threshold at 80% of ticket lifetime.
+QCDFS mount health monitor
+Create a Datadog monitor: alert when CIFS SessSetup = -13 errors exceed 50 occurrences within 5 minutes across any build host. Route to arriverci.admins PagerDuty.
+Kerberos ticket expiry monitor
+Create a Datadog log monitor for [Errno 127] Key has expired on QCDFS mount paths. Alert immediately on first occurrence — this is a leading indicator of the CIFS failure cascade.
+Pre-flight QCDFS connectivity check in VerifySrc
+Add a CloudBees pre-step that validates QCDFS mount accessibility and Kerberos ticket validity before starting VerifySrc. Fail fast with a clear, actionable error message (e.g., "QCDFS mount unavailable — Kerberos ticket expired") rather than a generic "Compile" failure.
+Formal incident declaration for farm-wide outages
+The QCDFS Kerberos outage (50,676+ errors, 19 hosts, 90+ minutes, 2+ confirmed job failures) was not declared as a formal incident. Implement auto-incident creation triggered by the CIFS error monitor above.
+Datadog agent deployment across all CRMBuilds agents
+Ensure all CloudBees build agents (including crm-ubuntulv* and crm-ubuntu* pools) have Datadog agents installed and reporting to enable future RCA investigations.
+12. Sources Used
+Source Type	Query Window	Evidence	Confidence
+Datadog Logs (flex)	06:00Z – 07:30Z	50,676+ CIFS SessSetup = -13 errors on 19 build hosts targeting \\QCDFS; Kerberos key expiry explicitly confirmed on lpi-aci-ubld040	HIGH
+Datadog Logs — Per-Minute Analysis (flex)	06:00Z – 07:30Z	90-minute per-minute breakdown confirming ~560 errors/min sustained rate; errors confirmed active during entire VerifySrc step window (06:27–06:30Z)	HIGH
+Datadog Logs — Step Window Analysis (flex)	06:27Z – 06:31Z	13 hosts with 2–216 CIFS errors during VerifySrc step window; confirms outage was active during step execution	HIGH
+Datadog Infrastructure	Current	crm-ubuntulv118 not registered in Datadog host inventory — no telemetry available	N/A
+Datadog Incidents	05:00Z – 08:00Z	No incidents declared for QCDFS, Kerberos, or CRM during outage window	N/A
+CloudBees Metadata	Job payload	Job ID, step name, exit code 0, agent host crm-ubuntulv118, timestamps, failure reason "Compile"	HIGH
+Cross-Job Correlation	06:25Z – 06:40Z	Job f179cd8b (Aurora build, same procedure, same step, same exit code) failed in same window — confirms systemic cause	HIGH

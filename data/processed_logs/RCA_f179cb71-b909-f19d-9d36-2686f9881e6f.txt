@@ -1,0 +1,174 @@
+Root Cause Analysis Report
+Job ID: f179cb71-b909-f19d-9d36-2686f9881e6f  |  Build: Balsam.LA.2.0.r2-00000-STD.INT-3  |  Outcome: ERROR / COMPILE
+
+---
+1. Executive Summary
+CloudBees job f179cb71-b909-f19d-9d36-2686f9881e6f failed during the "VerifySrc" step with exit code 0 on agent host crm-ubuntu232. The CloudBees execution context classifies the failure reason as "Compile".
+
+This job shares two critical anomalies with the earlier Balsam/CRMBuilds job on crm-ubuntu327:
+
+Exit Code 0 on a failed step — the VerifySrc process exited cleanly (success) yet the job outcome is error. This is the same anomalous pattern seen in job f179cba9 on crm-ubuntu327, where Artifactory LDAP failure caused authorization to fail silently.
+"Compile" failure reason — CloudBees applies this broad classification when source verification fails before compilation begins.
+However, this job's infrastructure profile is distinctly different from all previous jobs:
+
+Agent crm-ubuntu232 IS registered in Datadog (Agent 7.64.1, GNU/Linux) — full metric telemetry available
+The host was essentially idle during the entire VerifySrc step window (06:17:53–06:18:51Z): CPU at 0.10%, load at 0.17–0.36, IO await 0.01–0.32ms, IO util 0.10–0.44%, no network bursts
+All network activity occurred BEFORE the step started — small inbound (~9.74MB + 8.29MB) and outbound (~19.67MB) bursts at 06:17:24–06:17:42Z, 11–29 seconds before VerifySrc began
+No Artifactory LDAP failures detected during this specific window (06:17:00–06:22:00Z) — unlike the earlier CRMBuilds job on crm-ubuntu327
+Memory: 263–264GB usable, Disk: 42.7% used — no resource exhaustion
+CPU stolen: 0% — no hypervisor contention
+Probable Root Cause: The VerifySrc step ran on a completely idle host, completed its process cleanly (exit code 0), but its output validation logic detected a failure condition — most likely missing, incomplete, or inaccessible source content. The pre-step network activity (~18MB inbound, ~20MB outbound) suggests a small source fetch or handshake occurred before the step formally started, which may have returned incomplete or error content. The step's verification logic then detected the discrepancy and reported failure, exiting with code 0. CloudBees classified this as "Compile."
+
+The most likely cause is a source content validation failure — either the source package was incomplete, a checksum mismatch was detected, a required file was missing, or an upstream source repository returned an error response that the VerifySrc script parsed as a verification failure. Without step logs, the exact validation failure cannot be confirmed.
+
+⚠️ No application-level logs are forwarded from crm-ubuntu232 to Datadog. The Datadog Agent is installed and reporting metrics, but no log pipeline is configured. Step-level stdout/stderr must be retrieved directly from CloudBees to confirm the exact validation failure message.
+
+---
+2. Job Context
+Job ID: f179cb71-b909-f19d-9d36-2686f9881e6f
+Job Name: Balsam.LA.2.0.r2-00000-STD.INT-3_20260706_231643_231651
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: VerifySrc (Step ID: f179cb71-c391-f179-8ba9-1ea035bf3243)
+Exit Code: 0 ⚠️ — process exited cleanly despite job failure (same anomaly as job f179cba9 on crm-ubuntu327)
+Agent Host: crm-ubuntu232 (GNU/Linux, Datadog Agent 7.64.1 ✅ — metrics available, no log pipeline)
+Build Name: Balsam.LA.2.0.r2-00000-STD.INT-3
+Declared Failure Reason: Compile
+Build Type: Balsam LA 2.0.r2 — STD.INT (standard integration) build
+Step Duration: ~58 seconds (06:17:53 → 06:18:51Z)
+Job Duration: ~4m 18s (06:16:51 → 06:21:09Z)
+---
+3. Build Timeline
+Time (UTC)	Event	Detail
+2026-07-07 06:16:51	Job Started	CRMBuilds / Build.Rel.602829 initiated on crm-ubuntu232
+~2026-07-07 06:17:24–06:17:42	Pre-Step Network Activity	Small network bursts: ~9.74MB + 8.29MB inbound, ~19.67MB outbound — likely source fetch handshake or metadata retrieval. CPU user at ~2.02% (highest point). Activity completes before VerifySrc starts.
+2026-07-07 06:17:53	VerifySrc Step Started	Step begins — Correlation Window Opens. Host is idle: CPU 0.10%, load 0.33→0.17, IO near zero, no network activity.
+06:17:53–06:18:51	Step Runs on Idle Host	CPU: 0.10%, Load: 0.17–0.36, IO await: 0.01–0.32ms, IO util: 0.10–0.44%, Net: near zero. No infrastructure stress whatsoever. Step process runs and exits cleanly.
+2026-07-07 06:18:51	VerifySrc Step FAILED	Exit Code 0 — process exited cleanly but verification output indicated failure — Correlation Window Closes (duration: ~58s)
+2026-07-07 06:21:09	Job Ended	Job terminates with outcome: error (~2m 18s after step failure — cleanup/teardown)
+---
+4. Execution Path Inventory
+Failed Step: "VerifySrc" — source verification step; ran on an idle host, completed cleanly (exit 0), but output validation detected a failure condition
+Agent Host: crm-ubuntu232 (GNU/Linux, Datadog Agent 7.64.1 — metrics available, no log pipeline)
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Invoked Services: Source repository or artifact server (small pre-step network activity ~18MB inbound, ~20MB outbound suggests a fetch or metadata check); the specific endpoint is not identifiable from available metadata
+JIRA (qstability): JIRA queries for the "balsam" component were active at 06:17:51–06:21:56Z — these are read-only monitoring queries from an automated stability checker, OUT_OF_SCOPE for the build failure
+---
+5. Detected Error Codes & Signals
+Code / Signal	Source	Meaning	Evidence
+Exit Code 0 ⚠️	CloudBees Step Metadata	Anomalous. Process exited cleanly (success) yet step is marked failed. Identical to job f179cba9 on crm-ubuntu327. Indicates failure detected via output/content validation, not process crash. VerifySrc parsed its output and found missing, incorrect, or unauthorized source content.	failedStep.exitCode = "0" with outcome = "error"
+Compile (failedReason)	CloudBees executionContext	CloudBees broad classification applied when source verification fails before compilation begins. Same classification as job f179cba9.	executionContext.failedReason = "Compile"
+Host Idle During Step	Datadog Metrics — crm-ubuntu232	Infrastructure is NOT the cause. CPU 0.10%, load 0.17–0.36, IO await 0.01–0.32ms, IO util 0.10–0.44%, no network bursts during step. The host was completely idle when the step ran and failed.	All metrics during 06:17:53–06:18:51Z window
+Pre-Step Network Activity	Datadog Metrics — crm-ubuntu232	~9.74MB + 8.29MB inbound, ~19.67MB outbound at 06:17:24–06:17:42Z — 11–29 seconds before step start. Likely a source fetch or metadata retrieval that completed (or failed) before VerifySrc formally began.	system.net.bytes_rcvd/sent spikes at intervals 3–5
+No Artifactory LDAP Failures	Datadog Logs (Flex)	Zero Artifactory LDAP sync failures during 06:17:00–06:22:00Z. The LDAP failure pattern from job f179cba9 is NOT present for this job's window.	Zero results for Artifactory LDAP/auth queries
+CPU Stolen = 0	Datadog Metrics — crm-ubuntu232	No hypervisor CPU theft — VM-level resource contention is NOT a contributing factor	system.cpu.stolen = 0 throughout
+---
+6. Correlated Observations
+CloudBees
+Step "VerifySrc" failed with exit code 0 and failure reason "Compile" — identical anomalous exit code pattern to job f179cba9 on crm-ubuntu327
+Step duration: ~58 seconds — the shortest VerifySrc duration across all five jobs analyzed. Consistent with a fast-failing validation check (e.g., checksum mismatch detected immediately, or source content returned an error response that was quickly parsed)
+Job total duration: ~4m 18s — relatively short, consistent with early failure and quick teardown
+Build type Balsam.LA.2.0.r2-00000-STD.INT-3 — Balsam platform, standard integration build, revision 2
+Confidence: HIGH — directly from job payload
+Agent Host (crm-ubuntu232) — KEY FINDINGS
+✅ Datadog Agent 7.64.1 installed — full metric telemetry available
+
+✅ INFRASTRUCTURE IS HEALTHY — The agent host is definitively NOT the cause of this failure.
+
+CPU user: 0.10% during step — essentially zero. No compute load.
+System load: 0.17–0.36 during step — extremely low. No concurrent workload pressure.
+IO await: 0.01–0.32ms during step — negligible. No storage contention.
+IO util: 0.10–0.44% during step — no IO saturation whatsoever.
+Network: near zero during step — no active data transfer while the step was running.
+Memory: 263–264GB usable — no memory pressure.
+Disk: 42.7% used — no disk exhaustion.
+CPU stolen: 0% — no hypervisor contention.
+The pre-step network activity (~18MB inbound, ~20MB outbound at 06:17:24–06:17:42Z) is the only notable signal. This occurred during the job setup phase, 11–29 seconds before VerifySrc formally started. It likely represents a source fetch or metadata retrieval that completed before the step began. The small size (~18MB inbound) is consistent with a source manifest, metadata file, or small package — not a full source tree download.
+
+Contrast with other jobs: The WLAN TFH jobs had 257MB and 354MB network bursts with IO spikes. This Balsam job had only ~18MB total inbound and was completely idle during the step. The failure is definitively not infrastructure-related.
+
+Commander Host
+No Commander host identified in job metadata
+No Commander-related errors found in logs during the correlation window
+OUT_OF_SCOPE
+Datadog — Logs
+Zero log entries from crm-ubuntu232 — Datadog Agent installed but no log pipeline configured
+Zero Artifactory LDAP errors during this job's window — LDAP is NOT a factor for this specific job
+Zero active incidents during the job execution window
+No monitors configured for crm-ubuntu232
+JIRA — Scope Assessment
+JIRA qstability queries for "balsam" component were active at 06:17:51–06:21:56Z — these are automated read-only stability monitoring queries from andstab1 on vm-almjirawebprd-dc01/dc02
+These queries are OUT_OF_SCOPE — they are monitoring queries, not part of the build execution path, and have no causal relationship to the VerifySrc failure
+Their presence confirms the Balsam platform is actively monitored for stability issues, which may be relevant context for the build team
+Cross-Job Pattern — Exit Code 0 + Compile
+🔴 Pattern Match: This is the second job with exit code 0 + failedReason "Compile" + VerifySrc step failure across the five jobs analyzed:
+
+Job f179cba9 (crm-ubuntu327, CQ2390 GPS build) — exit 0, Compile, LDAP failure confirmed
+Job f179cb71 (crm-ubuntu232, Balsam build) — exit 0, Compile, no LDAP failure detected
+Both jobs share the same procedure (Build.Rel.602829) and the same anomalous exit code 0 pattern. The Balsam job's failure is likely a source content validation failure — the VerifySrc script detected missing or incorrect source content and reported failure via its output, not via a non-zero exit code.
+---
+7. Probable Root Cause
+Primary: Source Content Validation Failure in VerifySrc — Code/Data Issue
+
+The VerifySrc step ran on a completely healthy, idle host (crm-ubuntu232) and its process exited cleanly with code 0. Infrastructure is definitively excluded as a contributing factor. The failure was detected by the step's output validation logic — the VerifySrc script checked the fetched source content and found it to be missing, incomplete, checksummed incorrectly, or otherwise invalid. The script reported the validation failure through its output (not via exit code), and CloudBees classified this as a "Compile" failure.
+
+Most Likely Specific Causes (in order of probability):
+
+Source package missing or incomplete: The pre-step network activity (~18MB inbound) may have fetched a source manifest or partial package that was incomplete or returned an error response. VerifySrc then detected the missing content.
+Checksum/integrity mismatch: The fetched source content failed a checksum or hash verification check within the VerifySrc script.
+Source repository returned an error response: The upstream source repository (Artifactory, SCM, or build server) returned an HTTP error or empty response for the Balsam.LA.2.0.r2-00000 source package, which VerifySrc parsed as a verification failure.
+Required source file absent: A specific file or directory expected by the VerifySrc validation logic was not present in the fetched source tree.
+Build number 00000: The build name contains -00000- which may indicate a placeholder or uninitialized build number — this could mean the source package for this specific build revision does not exist in the repository, causing VerifySrc to fail validation.
+Supporting Evidence:
+
+Exit code 0 — process exited cleanly; failure is in output validation, not process execution (CloudBees metadata)
+Host completely idle during step — infrastructure definitively excluded (Datadog metrics: CPU 0.10%, load 0.17, IO await 0.01ms)
+No Artifactory LDAP failures — authorization failure excluded (Datadog logs)
+No network activity during step — no active data transfer while VerifySrc was running; source fetch completed (or failed) before step started (Datadog metrics)
+Pre-step network activity only ~18MB inbound — very small for a full source tree; consistent with metadata/manifest fetch or error response (Datadog metrics)
+Step duration ~58s — shortest VerifySrc duration across all jobs; consistent with fast-failing validation (CloudBees metadata)
+Build number "00000" — potentially invalid/placeholder build revision (CloudBees job name)
+failedReason = "Compile" — CloudBees broad classification for pre-compile source failures (CloudBees executionContext)
+---
+8. Confidence Level
+🔵 MEDIUM-HIGH (for infrastructure exclusion) / MEDIUM (for specific root cause)
+
+HIGH confidence that infrastructure is NOT the cause — direct metric evidence shows a completely idle host during the step. This is the strongest infrastructure exclusion across all five jobs analyzed.
+HIGH confidence that the failure is in source content validation — exit code 0 with a failed outcome is unambiguous evidence of output-based failure detection
+MEDIUM confidence on the specific validation failure (missing file, checksum mismatch, invalid build number) — step logs on crm-ubuntu232 are not available in Datadog (no log pipeline configured)
+NOTABLE: The build number "00000" is a strong candidate for the root cause — if this is a placeholder/uninitialized build number, the source package may simply not exist in the repository
+---
+9. Infrastructure vs Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue	NO — DEFINITIVELY EXCLUDED	Direct metric evidence: CPU 0.10%, load 0.17, IO await 0.01ms, IO util 0.10%, no network activity, no memory/disk pressure, no VM contention — all during the step window. The host was completely idle. Infrastructure cannot have caused this failure.
+Code / Data Issue	YES — MOST LIKELY	Exit code 0 with failed outcome = output validation failure. The VerifySrc script detected invalid, missing, or incorrect source content. This is a data/content issue (wrong build number, missing package, checksum failure) or a source repository issue — not an infrastructure failure.
+Mixed	NO	Infrastructure is definitively excluded. This is a pure code/data/content failure.
+---
+10. Recommended Remediation
+Retrieve VerifySrc step logs from CloudBees immediately: Access the CloudBees Commander UI for job f179cb71-b909-f19d-9d36-2686f9881e6f → Step "VerifySrc" → View Log. The step logs will contain the exact validation failure message — this is the single most important action for this job.
+Investigate the build number "00000": The build name Balsam.LA.2.0.r2-00000-STD.INT-3 contains -00000- which may be a placeholder or uninitialized build number. Verify whether a source package for this specific build revision exists in the source repository. If "00000" is a placeholder, the build may have been triggered with an invalid or unresolved build number.
+Check the source repository for Balsam.LA.2.0.r2-00000: Verify that the source package for this build revision is present, complete, and accessible in Artifactory or the SCM. Check for any recent changes to the Balsam.LA.2.0.r2 branch that may have affected source availability.
+Verify VerifySrc exit code behavior: Investigate why the VerifySrc script exits with code 0 on validation failure. This is a script design issue — validation failures should return a non-zero exit code to enable proper failure classification and alerting. This affects both this job and job f179cba9.
+Cross-reference with JIRA qstability: The automated JIRA stability checker was querying for "balsam" component issues at the time of the failure. Check whether any open JIRA tickets for the Balsam component relate to source availability or build failures.
+---
+11. Preventive Actions
+Fix VerifySrc Exit Code on Validation Failure: The VerifySrc script should return a non-zero exit code when source validation fails. Exit code 0 on failure makes it impossible to distinguish a successful verification from a failed one without parsing step logs. This is a systemic issue affecting at least two jobs (f179cba9 and f179cb71).
+Configure Datadog Log Pipeline on crm-ubuntu232: The Datadog Agent is installed but no logs are forwarded. Configure log collection for CloudBees agent logs and syslog. This would have provided the exact VerifySrc error message without requiring direct host access.
+Validate Build Numbers Before Triggering: Add a pre-flight check in the CloudBees procedure to validate that the build number is not a placeholder (e.g., "00000") before initiating the build. Reject builds with invalid build numbers early with a clear error message.
+Source Package Pre-Validation: Add a pre-step that verifies the existence and integrity of the source package in the repository before invoking VerifySrc. This provides a clearer failure message and avoids wasting agent resources on builds with missing source packages.
+Standardize Log Forwarding Across CRM Ubuntu Fleet: All 10 crm-ubuntu2xx hosts are registered in Datadog with Agent 7.64.1 but none appear to have log pipelines configured. Fleet-wide log forwarding configuration is needed for rapid RCA.
+Add VerifySrc Output Monitoring: Create a Datadog monitor or CloudBees post-step hook that parses VerifySrc output for validation failure keywords and alerts immediately, rather than relying on the broad "Compile" classification.
+---
+12. Sources Used
+Source Type	Query Window	Evidence	Relevance
+CloudBees Job Payload	N/A (provided)	Job ID, step "VerifySrc", exit code 0, agent host crm-ubuntu232, failedReason "Compile", build number "00000"	HIGH — Primary evidence source
+Datadog Host Inventory	Current	crm-ubuntu232 confirmed with Agent 7.64.1, GNU/Linux. 10 crm-ubuntu2xx hosts all registered.	HIGH — Confirms telemetry availability
+Datadog Metrics — system.cpu.* / system.load.1	06:17:00–06:21:00Z	CPU user 0.10%, load 0.17–0.36, stolen 0% during step — host completely idle	HIGH — Definitively excludes CPU/compute as failure cause
+Datadog Metrics — system.io.await / system.io.util	06:17:06–06:21:00Z	IO await 0.01–0.32ms, IO util 0.10–0.44% during step — no IO contention	HIGH — Definitively excludes storage IO as failure cause
+Datadog Metrics — system.net.bytes_rcvd/sent	06:17:06–06:21:00Z	~18MB inbound + ~20MB outbound pre-step (06:17:24–06:17:42Z); near zero during step	HIGH — Confirms small pre-step fetch; no active transfer during step
+Datadog Metrics — system.mem.usable / system.disk.in_use	06:17:05–06:21:00Z	Memory 263–264GB usable, disk 42.7% used — no resource exhaustion	HIGH — Definitively excludes memory/disk as failure cause
+Datadog Logs — Artifactory (Flex)	06:00:00–06:22:00Z	Zero LDAP sync failures, zero auth errors during this job's window	HIGH — Explicitly excludes LDAP/auth as contributing factor
+Datadog Logs — General (Flex)	06:17:00–06:22:00Z	Zero logs from crm-ubuntu232; JIRA qstability queries for "balsam" (OUT_OF_SCOPE); no log pipeline on agent	Confirms log coverage gap; JIRA queries excluded from scope
+Datadog Incidents	06:16:00–06:22:00Z	Zero active incidents	No relevant findings
+Prior Job RCAs (cross-reference)	Same time window	Job f179cba9: exit 0 + Compile + LDAP failure. This job: exit 0 + Compile + no LDAP failure. Same exit code pattern, different root cause.	MEDIUM — Pattern correlation; confirms exit code 0 is a VerifySrc script design issue

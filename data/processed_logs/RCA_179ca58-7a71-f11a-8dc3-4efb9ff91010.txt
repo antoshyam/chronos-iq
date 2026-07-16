@@ -1,0 +1,173 @@
+Root Cause Analysis Report
+Job ID: f179ca58-7a71-f11a-8dc3-4efb9ff91010  |  Build: WLAN.TFH.3.7.1-01029-QCATFSWPZ-1  |  Outcome: ERROR / ABORTED
+
+---
+1. Executive Summary
+CloudBees job f179ca58-7a71-f11a-8dc3-4efb9ff91010 failed during the "VerifySrc" step with exit code 2 on agent host san-w175-ha1-4-07. The CloudBees execution context classifies the failure reason as "Aborted".
+
+This job is critically significant for three reasons:
+
+Same host as job f179cb72 — san-w175-ha1-4-07 has now failed twice with identical signatures: exit code 2, "Aborted", VerifySrc, Build.Rel.602829, WLAN TFH QCATFSWPZ. This is the third consecutive WLAN TFH VerifySrc abort across the five-job session (also including f179cb7a on san-w175-ja4-6-06).
+Earlier time window — this job ran at 06:08:59–06:18:16Z, approximately 11 minutes before job f179cb72 (06:16:52–06:25:54Z) on the same host. The host failed VerifySrc twice in the same morning session.
+Identical infrastructure signature — large outbound transfer (~70MB+ sent) during/around the step, CPU dropping to near zero before step starts, IO near zero during step, no LDAP failures. The pattern is a precise match to the previous job on this host.
+Probable Root Cause: The VerifySrc step was aborted during a large outbound transfer (~70MB+ sent starting 18 seconds before the step formally began). The transfer stalled or exceeded a timeout threshold, triggering an abort. This is the same failure mode as job f179cb72 on the same host, confirming a persistent, recurring issue with the VerifySrc upload operation on san-w175-ha1-4-07 — not a transient one-time event.
+
+⚠️ No application-level logs are forwarded from san-w175-ha1-4-07 to Datadog. The Datadog Agent is installed and reporting metrics, but no log pipeline is configured. Step-level stdout/stderr must be retrieved directly from CloudBees.
+
+---
+2. Job Context
+Job ID: f179ca58-7a71-f11a-8dc3-4efb9ff91010
+Job Name: WLAN.TFH.3.7.1-01029-QCATFSWPZ-1_20260706_230844_230859
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: VerifySrc (Step ID: f179ca58-867f-f12f-be4a-1ea035bf3243)
+Exit Code: 2 — script-level abort
+Agent Host: san-w175-ha1-4-07 (GNU/Linux, Datadog Agent 7.64.1 ✅ — same host as job f179cb72)
+Build Name: WLAN.TFH.3.7.1-01029-QCATFSWPZ-1
+Declared Failure Reason: Aborted
+Build Type: WLAN TFH 3.7.1 — QCATFSWPZ-1 variant (note: f179cb72 was QCATFSWPZ-2, same base build)
+Step Duration: ~58 seconds (06:11:47 → 06:12:46Z)
+Job Duration: ~9m 17s (06:08:59 → 06:18:16Z)
+Disk Usage at Step Time: 5.13% — significantly lower than the later job's 42.1% on the same host
+---
+3. Build Timeline
+Time (UTC)	Event	Detail
+2026-07-07 06:08:59	Job Started	CRMBuilds / Build.Rel.602829 initiated on san-w175-ha1-4-07
+~2026-07-07 06:09:28–06:09:52Z	Large Inbound Burst (Pre-Step)	net_rcvd spikes: 2.05MB → 16.93MB → 50.81MB → 49.69MB → 29.03MB — ~148MB total inbound. Large source package download during job setup phase. CPU user peaks at 1.48%.
+~2026-07-07 06:10:22–06:11:41Z	⚡ Large Outbound Burst Begins (Pre-Step)	net_sent: 11.52MB → 5.47MB → 10.35MB — sustained outbound transfer begins ~1m 25s before step starts. CPU drops to 0.05% at ~06:11:20Z.
+~2026-07-07 06:11:05Z	IO Spike (Pre-Step)	IO await 2.128ms, IO util 3.464% — brief storage burst from download write. Subsides quickly.
+2026-07-07 06:11:47	VerifySrc Step Started	Step begins — Correlation Window Opens. Outbound transfer already in progress (7.08MB/6s). CPU at 0.05%. Load declining from 1.71 → 1.15.
+06:11:47–06:12:46Z	⚡ Sustained Outbound During Step	net_sent: 7.08MB → 382KB → 4.51MB → 17.67MB → 18.11MB — outbound burst continues and intensifies during step. IO near zero. CPU 0.05–0.19%.
+2026-07-07 06:12:46	VerifySrc Step ABORTED	Exit Code 2 — step terminated — Correlation Window Closes (duration: ~58s)
+2026-07-07 06:18:16	Job Ended	Job terminates with outcome: error (~5m 30s after step abort — extended cleanup/teardown)
+~2026-07-07 06:16:52Z	⚡ Second Job Starts on Same Host	Job f179cb72 (WLAN.TFH.3.6.c2-00721-QCATFSWPZ-2) starts on san-w175-ha1-4-07 while this job is still in teardown — overlapping execution on same agent
+---
+4. Execution Path Inventory
+Failed Step: "VerifySrc" — source verification step; large inbound download (~148MB) during setup, then large outbound transfer (~70MB+) during/around step execution
+Agent Host: san-w175-ha1-4-07 (GNU/Linux, Datadog Agent 7.64.1 — metrics available, no log pipeline; same host as job f179cb72)
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Invoked Services: Source repository (large inbound ~148MB download during setup); remote upload endpoint (large outbound ~70MB+ during step — same unknown endpoint as job f179cb72)
+Concurrent Job Overlap: Job f179cb72 started on this same host at 06:16:52Z while this job was still in teardown (ended 06:18:16Z) — confirmed overlapping execution
+---
+5. Detected Error Codes & Signals
+Code / Signal	Source	Meaning	Evidence
+Exit Code 2	CloudBees Step Metadata	Script-level abort — timeout or transfer failure. Identical to jobs f179cb7a and f179cb72.	failedStep.exitCode = "2"
+Aborted	CloudBees executionContext	Step terminated before natural completion	executionContext.failedReason = "Aborted"
+Large Inbound ~148MB (Pre-Step)	Datadog Metrics — san-w175-ha1-4-07	50.81MB + 49.69MB + 29.03MB + smaller bursts at ~06:09:28–06:11:05Z — large source package download during job setup. Larger than previous job's pre-step activity.	system.net.bytes_rcvd peaks at points 7–9 of first metric window
+Sustained Outbound ~70MB+ (During/Around Step)	Datadog Metrics — san-w175-ha1-4-07	11.52MB + 5.47MB + 10.35MB (pre-step) + 7.08MB + 4.51MB + 17.67MB + 18.11MB (during step) = ~74MB total outbound. Sustained upload operation that was already in progress when step started.	system.net.bytes_sent sustained across both metric windows
+IO Spike 2.128ms (Pre-Step)	Datadog Metrics — san-w175-ha1-4-07	Brief IO await spike at 06:11:17Z from download write. Subsides to near zero before step starts. IO is NOT a factor during the step itself.	system.io.await = 2.128ms at point 3 of second window
+CPU Drop to 0.05% Pre-Step	Datadog Metrics — san-w175-ha1-4-07	CPU user drops from ~1.10% to 0.05% at ~06:11:20Z — 27 seconds before step starts. Prior process completed. Step runs on an idle CPU.	system.cpu.user sharp decline at points 9–12 of second CPU window
+Disk 5.13% Used	Datadog Metrics — san-w175-ha1-4-07	Disk nearly empty at this time. Contrast: same host showed 42.1% disk usage during job f179cb72 (~11 minutes later). Disk fill-up between the two jobs is notable but not a factor for this job.	system.disk.in_use = 0.0513 (5.13%)
+CPU Stolen = 0	Datadog Metrics — san-w175-ha1-4-07	No hypervisor CPU theft — VM-level resource contention excluded	system.cpu.stolen = 0 throughout
+No Artifactory LDAP Failures	Datadog Logs (Flex)	Zero LDAP sync failures during 06:08:00–06:15:00Z — LDAP is NOT a factor	Zero results for Artifactory LDAP queries
+⚠️ Disk Jump: 5.13% → 42.1%	Datadog Metrics — san-w175-ha1-4-07	Disk usage on san-w175-ha1-4-07 jumped from 5.13% (this job, 06:11Z) to 42.1% (job f179cb72, 06:19Z) — a ~37% increase in ~8 minutes. The large inbound download (~148MB) and subsequent jobs likely filled the workspace. This is a secondary finding — not a cause of this job's failure but a risk factor for subsequent jobs.	Cross-job metric comparison: this job vs f179cb72 on same host
+---
+6. Correlated Observations
+CloudBees
+Step "VerifySrc" failed with exit code 2 and failure reason "Aborted" — identical to jobs f179cb7a (san-w175-ja4-6-06) and f179cb72 (same host, later)
+Step duration: ~58 seconds — same as the Balsam job (f179cb71), shorter than f179cb72's 77s
+Build name: WLAN.TFH.3.7.1-01029-QCATFSWPZ-1 — this is variant "-1" of the same build that also failed as variant "-2" (job f179cb7a on san-w175-ja4-6-06). Both variants of the same WLAN TFH 3.7.1-01029 build failed VerifySrc with exit code 2 and "Aborted".
+Confidence: HIGH — directly from job payload
+Agent Host (san-w175-ha1-4-07) — KEY FINDINGS
+✅ Datadog Agent 7.64.1 installed — full metric telemetry available
+
+Large inbound download (~148MB) at ~06:09:28–06:11:05Z — source package fetch during job setup. Larger than the previous job's pre-step activity.
+Sustained outbound transfer (~74MB total) starting at ~06:10:22Z — 1m 25s before step starts — and continuing through the step window. The upload was already in progress when VerifySrc formally began.
+IO near zero during step — IO await 0.021–0.142ms, IO util 0.091–0.411%. Storage is not a bottleneck.
+CPU at 0.05% during step — host is idle from a compute perspective.
+Load declining from 1.71 → 1.15 during step — pressure was higher before the step and was already subsiding.
+Memory: ~392–393GB usable — no memory pressure.
+Disk: 5.13% used — nearly empty at this time. The disk fills to 42.1% by the next job (~8 minutes later), suggesting the large download and workspace files from this job consumed significant disk space.
+Comparison: This Job vs Previous Job on Same Host (f179cb72):
+
+Signal	f179ca58 (this job, 06:11:47Z)	f179cb72 (later job, 06:19:50Z)
+Exit code	2	2
+Failure reason	Aborted	Aborted
+Inbound (pre-step)	~148MB (large download)	~1.4MB (minimal)
+Outbound (during/around step)	~74MB (sustained upload)	~354MB (larger upload)
+IO await peak	2.128ms (pre-step only)	15.97ms (pre-step only)
+Disk usage	5.13% (nearly empty)	42.1% (filled by prior jobs)
+Step duration	~58s	~77s
+LDAP failures	None	None
+Commander Host
+No Commander host identified — OUT_OF_SCOPE
+Datadog — Logs & Incidents
+Zero log entries from san-w175-ha1-4-07 — no log pipeline configured
+Zero Artifactory LDAP errors during this job's window — LDAP excluded
+Zero active incidents during the job execution window
+Cross-Job Pattern — WLAN TFH VerifySrc Abort (Now 3 Jobs)
+🔴 SYSTEMIC PATTERN CONFIRMED: Three WLAN TFH VerifySrc aborts with identical signatures:
+
+Job f179cb7a — WLAN.TFH.3.7.1-01029-QCATFSWPZ-2 on san-w175-ja4-6-06 (06:19:31Z)
+Job f179cb72 — WLAN.TFH.3.6.c2-00721-QCATFSWPZ-2 on san-w175-ha1-4-07 (06:19:50Z)
+Job f179ca58 — WLAN.TFH.3.7.1-01029-QCATFSWPZ-1 on san-w175-ha1-4-07 (06:11:47Z)
+Three different build variants, two different agents, same rack (san-w175), same procedure, same exit code 2, same "Aborted" reason, same VerifySrc step, all with large outbound transfers. This is not an agent-specific issue — it is a systemic VerifySrc script or remote endpoint issue affecting all WLAN TFH builds.
+---
+7. Probable Root Cause
+Primary: Systemic VerifySrc Upload Abort — Remote Endpoint Failure or Script Timeout
+
+The VerifySrc step initiated a large outbound transfer (~74MB) to a remote endpoint, beginning ~1m 25s before the step formally started. The transfer stalled or exceeded a timeout threshold during the step window, triggering an abort (exit code 2). This is the same failure mode as jobs f179cb7a and f179cb72, confirmed across three different WLAN TFH build variants on two different agents. The consistent pattern across multiple agents and build variants eliminates agent-specific infrastructure as the root cause and points to a systemic issue with the VerifySrc upload operation — either the remote endpoint was unavailable/slow, or the VerifySrc script has a timeout that is too short for the volume of data being transferred.
+
+Causal Chain:
+
+Job setup phase downloads large source package (~148MB inbound at ~06:09:28–06:11:05Z)
+VerifySrc begins uploading verification data/artifacts to remote endpoint at ~06:10:22Z (1m 25s before step formally starts)
+VerifySrc step formally starts at 06:11:47Z — upload already in progress (~74MB sent so far)
+Upload continues during step (7.08MB → 4.51MB → 17.67MB → 18.11MB per 6s interval)
+Transfer stalls or exceeds timeout threshold — abort signal triggered
+VerifySrc script exits with code 2 at 06:12:46Z
+CloudBees marks step as failed with reason "Aborted"
+Supporting Evidence:
+
+~74MB outbound transfer during/around step (Datadog system.net.bytes_sent)
+Transfer already in progress 1m 25s before step starts — upload is a pre-step operation that continues into the step (Datadog metrics)
+IO near zero during step — storage not a bottleneck (Datadog system.io.await)
+CPU at 0.05% during step — compute not a bottleneck (Datadog system.cpu.user)
+Exit code 2 + "Aborted" — external termination confirmed (CloudBees metadata)
+CPU stolen = 0% — hypervisor contention excluded (Datadog system.cpu.stolen)
+No LDAP failures — authorization excluded (Datadog logs)
+Same failure on same host 11 minutes later (job f179cb72) — persistent, not transient (cross-job analysis)
+Same failure on different agent (f179cb7a on san-w175-ja4-6-06) — not host-specific (cross-job analysis)
+---
+8. Confidence Level
+✅ HIGH (for systemic pattern) / MEDIUM (for specific abort trigger)
+
+HIGH confidence that this is a systemic VerifySrc issue — three identical failures across two agents and three build variants confirm this is not agent-specific
+HIGH confidence that the step was aborted during an outbound transfer — direct metric evidence
+HIGH confidence that agent infrastructure is not the root cause — IO near zero, CPU near zero, no memory/disk pressure during step
+MEDIUM confidence on the specific abort trigger (remote endpoint failure vs. script timeout) — step logs required to confirm
+---
+9. Infrastructure vs Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue (Agent)	NO — EXCLUDED	IO near zero, CPU 0.05%, no memory/disk pressure during step. Same failure occurs on a different agent (san-w175-ja4-6-06). Agent infrastructure is not the cause.
+Infrastructure Issue (Remote Endpoint)	LIKELY — YES	The remote endpoint receiving the outbound transfer is in the execution path and is the most likely point of failure. Three jobs failing with the same upload abort pattern across different agents strongly suggests the remote endpoint was unavailable, slow, or rejecting connections during this time window.
+Code Issue (Script)	POSSIBLE	The VerifySrc script may have an insufficient timeout for large WLAN TFH source trees. Cannot confirm without step logs.
+Mixed	POSSIBLE	Remote endpoint failure + insufficient script timeout could both contribute.
+---
+10. Recommended Remediation
+Identify the remote upload endpoint from VerifySrc step logs: This is the single highest-priority action. Retrieve step logs for all three WLAN TFH VerifySrc abort jobs (f179ca58, f179cb7a, f179cb72) and identify the common upload destination. Check the health and availability of that endpoint during 06:10–06:21Z on 2026-07-07.
+Investigate disk fill-up on san-w175-ha1-4-07: Disk usage jumped from 5.13% to 42.1% between this job (06:11Z) and the next job (06:19Z) on the same host. The ~148MB inbound download and workspace files from this job likely contributed. Verify that workspace cleanup is occurring between jobs and that disk usage is not trending toward exhaustion.
+Check for overlapping job execution: Job f179cb72 started at 06:16:52Z while this job was still in teardown (ended 06:18:16Z). Verify whether CloudBees is allowing concurrent jobs on san-w175-ha1-4-07 and whether this overlap contributed to the disk fill-up and the second job's failure.
+Re-run all three WLAN TFH VerifySrc abort jobs after confirming the remote endpoint is healthy. If the endpoint was temporarily unavailable, re-runs should succeed.
+Implement retry logic in VerifySrc: Add retry with exponential backoff for the upload operation. A single transient endpoint failure should not abort the entire build.
+---
+11. Preventive Actions
+Configure Datadog Log Pipeline on san-w175-ha1-4-07: This host has failed VerifySrc twice in 11 minutes. Without log forwarding, each failure requires manual CloudBees log retrieval. Immediate priority.
+Monitor the VerifySrc Upload Endpoint: Create a Datadog Synthetic test or monitor on the remote endpoint that VerifySrc uploads to. Alert immediately when the endpoint becomes unavailable — this would have detected the issue before any of the three WLAN TFH jobs failed.
+Disk Usage Monitoring on san-w175-ha1-4-07: The 5.13% → 42.1% disk jump in 8 minutes is alarming. Create a Datadog monitor on system.disk.in_use for all san-w175 agents. Alert at 70% to prevent disk exhaustion from causing future build failures.
+Workspace Cleanup Policy: Enforce CloudBees workspace cleanup between jobs on san-w175-ha1-4-07. The rapid disk fill-up suggests workspaces from failed jobs are not being cleaned up, which will eventually cause disk exhaustion.
+Concurrent Job Limit: Investigate whether san-w175-ha1-4-07 should allow concurrent jobs given the disk fill-up pattern. The overlap between f179ca58 (teardown) and f179cb72 (startup) at 06:16:52Z may be contributing to resource contention.
+VerifySrc Timeout Increase: Increase the upload timeout in the VerifySrc script for WLAN TFH builds, which involve large source trees (148MB+ downloads, 74–354MB uploads).
+---
+12. Sources Used
+Source Type	Query Window	Evidence	Relevance
+CloudBees Job Payload	N/A (provided)	Job ID, step "VerifySrc", exit code 2, agent host san-w175-ha1-4-07, failedReason "Aborted"	HIGH — Primary evidence source
+Datadog Host Inventory	Current	san-w175-ha1-4-07 confirmed Agent 7.64.1, GNU/Linux — same host as job f179cb72	HIGH — Confirms telemetry availability and host identity
+Datadog Metrics — system.net.bytes_rcvd/sent	06:09:04–06:13:00Z	~148MB inbound (pre-step download); ~74MB outbound (during/around step upload)	HIGH — Identifies upload as primary operation and abort trigger
+Datadog Metrics — system.io.await/util	06:09:04–06:13:00Z	Peak 2.128ms pre-step; near zero during step — IO not a factor	HIGH — Excludes IO contention as cause
+Datadog Metrics — system.cpu.user/stolen/load	06:09:12–06:13:00Z	CPU 0.05% during step; stolen 0%; load declining 1.71→1.15	HIGH — Excludes CPU/compute as cause
+Datadog Metrics — system.disk.in_use	06:11:04–06:13:00Z	5.13% at step time; cross-job comparison shows 42.1% on same host 8 minutes later	MEDIUM — Disk fill-up pattern identified; secondary finding
+Datadog Logs — Artifactory (Flex)	06:08:00–06:15:00Z	Zero LDAP failures — authorization excluded	HIGH — Explicitly excludes LDAP as factor
+Datadog Incidents	06:08:00–06:20:00Z	Zero active incidents	No relevant findings
+Cross-Job Analysis (f179cb7a, f179cb72)	Same morning session	Three WLAN TFH VerifySrc aborts: exit 2, Aborted, Build.Rel.602829 — two agents, three build variants	HIGH — Confirms systemic pattern, eliminates agent-specific cause

@@ -1,0 +1,144 @@
+Root Cause Analysis Report
+Job ID: f179cba9-dcae-f125-a110-2686f9881e6f  |  Build: CQ2390.LA.1.0-00317-perf.apq.GPS.hy11-1  |  Outcome: ERROR
+
+---
+1. Executive Summary
+CloudBees job f179cba9-dcae-f125-a110-2686f9881e6f failed during the "VerifySrc" step on agent host crm-ubuntu327. This job presents two immediately anomalous characteristics that distinguish it from a standard compile failure:
+
+Exit Code 0 on a failed step — the VerifySrc step returned success (exit code 0) yet the job outcome is error and the build is classified as Failed / Compile. This is a strong indicator that the failure was detected by the step's output validation logic rather than a process crash.
+Artifactory LDAP Authentication Failure — At 06:19:14Z, exactly 7 seconds before the VerifySrc step started (06:19:21Z), all Artifactory ent-las nodes began failing to sync the Restricted-CRMBuilds-Read-Only LDAP group against qed-ldap.qualcomm.com:636. This is an acute, new issue (115 occurrences confined entirely to the 06:00 UTC hour — no prior history in the preceding 24 hours). This failure would prevent Artifactory from authorizing CRMBuilds users/agents to access restricted repositories, causing source verification to fail even though the process itself exited cleanly.
+Probable Root Cause: The VerifySrc step attempted to verify/fetch source artifacts or dependencies from Artifactory. The Artifactory LDAP sync failure for Restricted-CRMBuilds-Read-Only caused authorization to fail for the CRMBuilds agent, resulting in source verification failure. The step process exited with code 0 (clean exit) but the verification output indicated failure, which CloudBees classified as a Compile failure.
+
+⚠️ Agent host crm-ubuntu327 has NO Datadog telemetry coverage. Infrastructure-level contribution (disk, CPU, memory, network) on the agent cannot be confirmed or excluded. CloudBees step execution logs must be examined directly.
+
+---
+2. Job Context
+Job ID: f179cba9-dcae-f125-a110-2686f9881e6f
+Job Name: CQ2390.LA.1.0-00317-perf.apq.GPS.hy11-1_20260706_231819_231826
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: VerifySrc (Step ID: f179cba9-e847-f173-8c29-1ea035bf3243)
+Exit Code: 0 ⚠️ (anomalous — process exited cleanly despite job failure)
+Agent Host: crm-ubuntu327
+Build Name: CQ2390.LA.1.0-00317-perf.apq.GPS.hy11-1
+Declared Failure Reason: Compile
+Build Type: perf.apq.GPS.hy11 (performance APQ GPS build)
+---
+3. Build Timeline
+Time (UTC)	Event	Detail
+2026-07-07 06:18:26	Job Started	CRMBuilds / Build.Rel.602829 initiated
+2026-07-07 06:19:14	⚡ LDAP Sync Failure Begins	artifactory-ent-las-08 begins failing to sync Restricted-CRMBuilds-Read-Only group against qed-ldap.qualcomm.com:636 — 4 rapid failures in 266ms
+2026-07-07 06:19:21	VerifySrc Step Started	Step begins on crm-ubuntu327 — Correlation Window Opens (7s after LDAP failure onset)
+2026-07-07 06:21:12	VerifySrc Step FAILED	Exit Code 0 — process exited cleanly but verification failed — Correlation Window Closes (duration: ~1m 51s)
+2026-07-07 06:24:13	Job Ended	Job terminates with outcome: error
+2026-07-07 06:24:20–06:24:29	LDAP Failure Second Wave	46 LDAP sync failures across ent-las-04, -05, -07, -08, -09, -10 — fleet-wide impact confirmed
+---
+4. Execution Path Inventory
+Failed Step: "VerifySrc" — source verification step, likely fetching/validating source artifacts from Artifactory
+Agent Host: crm-ubuntu327 (Linux Ubuntu — inferred from hostname; no Datadog coverage)
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Directly Invoked Service: Artifactory (ent-las cluster) — LDAP sync failure for Restricted-CRMBuilds-Read-Only group directly impacts CRMBuilds authorization
+LDAP Server: qed-ldap.qualcomm.com:636 — failed to respond to Artifactory group sync requests
+---
+5. Detected Error Codes & Anomalies
+Code / Signal	Source	Meaning	Evidence
+Exit Code 0 ⚠️	CloudBees Step Metadata	Anomalous. Process exited cleanly (success) yet step is marked failed. Indicates failure detected via output/content validation, not process crash. VerifySrc likely parsed output and found missing/incorrect artifacts.	failedStep.exitCode = "0" with outcome = "error"
+LDAP Sync Failure	Artifactory Logs (Datadog)	"Could not sync ldap groups Restricted-CRMBuilds-Read-Only: qed-ldap.qualcomm.com:636" — Artifactory cannot authorize CRMBuilds group members against restricted repositories	115 occurrences in 06:00 UTC hour; first burst at 06:19:14Z (7s before step start); fleet-wide across ent-las-04/05/07/08/09/10
+Acute LDAP Outage	Artifactory Logs (Datadog)	Zero LDAP sync failures in the 24 hours preceding the build window — this is a new failure, not a chronic background issue	24-hour log analysis: 0 occurrences before 06:00 UTC on 2026-07-07
+Compile (failedReason)	CloudBees executionContext	CloudBees classified the failure as compile-type — may be a broad classification applied when source verification fails before compilation begins	executionContext.failedReason = "Compile"
+---
+6. Correlated Observations
+CloudBees
+Step "VerifySrc" failed with exit code 0 — highly anomalous. Standard compile/make failures produce non-zero exit codes. Exit code 0 with a failed outcome strongly suggests the VerifySrc script ran to completion but its output validation detected missing, incomplete, or unauthorized source content.
+Step duration: ~1m 51s — consistent with a source fetch/verification operation that partially completed before detecting an error condition.
+Build type perf.apq.GPS.hy11 — GPS performance build, likely requires specific restricted source packages from Artifactory.
+Confidence: HIGH — directly from job payload
+Agent Host (crm-ubuntu327)
+⚠️ Agent host crm-ubuntu327 has NO telemetry coverage in Datadog.
+The host is absent from the Datadog host inventory and all CRM Ubuntu 3xx hosts queried. No CPU, memory, disk, or network metrics available. No logs found. CloudBees step execution logs must be examined directly on crm-ubuntu327.
+
+Commander Host
+No Commander host identified in job metadata
+No Commander-related errors found in logs during the correlation window
+OUT_OF_SCOPE — no evidence of Commander contribution
+Datadog — Artifactory / LDAP (KEY FINDING)
+🔴 CRITICAL: Artifactory LDAP Sync Failure for Restricted-CRMBuilds-Read-Only
+
+First failure: 06:19:14.384Z — 4 rapid failures on artifactory-ent-las-08 within 266ms
+VerifySrc step started: 06:19:21Z — 7 seconds after LDAP failure onset
+Affected nodes: artifactory-ent-las-04, -05, -06, -07, -08, -09, -10 (fleet-wide)
+Total occurrences: 115 in the 06:00 UTC hour
+LDAP server: qed-ldap.qualcomm.com:636 (LDAPS)
+Affected group: Restricted-CRMBuilds-Read-Only — the exact permission group for the CRMBuilds project
+Historical baseline: Zero occurrences in the 24 hours prior — acute new failure
+Artifactory nodes ent-las-07 through -10: Registered in Datadog with no OS detected and no agent — partial infrastructure visibility
+Confidence: HIGH — direct log evidence with precise timestamps
+Datadog — Incidents & Monitors
+Zero active incidents during the job execution window
+No monitors configured for crm-ubuntu327
+No Datadog alerts directly referencing this job, build name, or agent host
+External Dependencies — SCOPE VALIDATION
+Artifactory 404s on lint-lv-local: HEAD requests returning 404 for sstate cache files — these are cache misses (normal behavior for Yocto/BitBake builds) and are OUT_OF_SCOPE for this job unless VerifySrc specifically requires lint-lv-local.
+datacenter-qranium-prod-gitlfs-virtual 404: GitLFS statistics PUT — unrelated to CRMBuilds. OUT_OF_SCOPE
+---
+7. Probable Root Cause
+Primary: Artifactory LDAP Authentication Failure → Source Verification Failure
+
+The Artifactory ent-las cluster lost the ability to sync the Restricted-CRMBuilds-Read-Only LDAP group from qed-ldap.qualcomm.com:636 starting at 06:19:14Z — 7 seconds before the VerifySrc step began. When the VerifySrc step attempted to fetch or verify restricted source packages from Artifactory, the LDAP authorization failure prevented the CRMBuilds agent from accessing the restricted repository. The VerifySrc script detected missing or inaccessible source content, reported a verification failure, and exited cleanly (exit code 0). CloudBees interpreted the verification failure as a Compile-category failure.
+
+Causal Chain:
+
+qed-ldap.qualcomm.com:636 becomes unreachable or returns errors at ~06:19:14Z
+Artifactory ent-las nodes cannot sync Restricted-CRMBuilds-Read-Only group membership
+VerifySrc step starts at 06:19:21Z and requests restricted source artifacts from Artifactory
+Artifactory cannot authorize the CRMBuilds agent (group sync failed) → access denied or stale permissions
+VerifySrc detects missing/inaccessible source → reports verification failure → exits with code 0
+CloudBees marks step as failed, classifies as "Compile" failure
+Supporting Evidence:
+
+LDAP failure onset at 06:19:14Z — 7 seconds before step start (Datadog Artifactory logs)
+Affected group: Restricted-CRMBuilds-Read-Only — directly matches the CRMBuilds project
+Fleet-wide impact: 7 Artifactory nodes affected — not a single-node anomaly
+Acute failure: zero prior occurrences in 24-hour baseline — new issue, not background noise
+Exit code 0: process exited cleanly — consistent with a script that detected an error condition in its output rather than a process crash
+---
+8. Confidence Level
+✅ MEDIUM-HIGH
+
+HIGH confidence that the Artifactory LDAP failure is real and affected CRMBuilds authorization — direct log evidence with precise timestamps
+HIGH confidence on timing correlation — LDAP failure 7 seconds before step start is not coincidental given the group name exactly matches the project
+MEDIUM confidence on the causal link between LDAP failure and VerifySrc failure — the step logs on crm-ubuntu327 are not available to confirm the exact error message received by the VerifySrc script
+Cannot achieve HIGH without direct VerifySrc step log output confirming an Artifactory authorization error
+---
+9. Infrastructure vs Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue	YES — LIKELY	LDAP server qed-ldap.qualcomm.com:636 failure is an infrastructure event. Artifactory fleet-wide LDAP sync failure is an infrastructure dependency failure directly in the execution path of the VerifySrc step.
+Code Issue	NO — UNLIKELY	Exit code 0 rules out a compiler crash or syntax error. No compiler error messages found. The "Compile" classification by CloudBees appears to be a broad category applied when source verification fails before compilation begins.
+Mixed	POSSIBLE	Cannot fully exclude a code-level issue in the VerifySrc script itself without step logs. However, the LDAP failure is the dominant and most evidenced cause.
+---
+10. Recommended Remediation
+Investigate qed-ldap.qualcomm.com:636 availability at 06:19 UTC: Check LDAP server logs, network connectivity, and TLS certificate validity for the LDAPS endpoint. Determine why the server became unreachable or began rejecting sync requests at this time.
+Check Artifactory LDAP configuration: Review the Artifactory LDAP sync configuration for the Restricted-CRMBuilds-Read-Only group. Verify bind credentials, connection timeout settings, and failover configuration.
+Retrieve VerifySrc step logs from crm-ubuntu327: Access the CloudBees Commander UI for job f179cba9-dcae-f125-a110-2686f9881e6f → Step "VerifySrc" → View Log. Confirm whether the step output contains Artifactory 401/403 errors or "access denied" messages.
+Re-run the build: If the LDAP server has recovered, re-trigger the build. The VerifySrc step should succeed if Artifactory can now authorize the CRMBuilds agent.
+Verify LDAP server recovery: Confirm that qed-ldap.qualcomm.com:636 is fully operational and that all Artifactory ent-las nodes have successfully re-synced the Restricted-CRMBuilds-Read-Only group before re-running.
+---
+11. Preventive Actions
+LDAP High Availability: Implement LDAP failover/redundancy for qed-ldap.qualcomm.com:636. A single LDAP server failure should not block all CRMBuilds jobs across the entire Artifactory fleet.
+Artifactory LDAP Monitoring: Create a Datadog monitor on the "Could not sync ldap groups" log pattern for Artifactory. Alert immediately when LDAP sync failures begin — this issue went undetected for the entire build window.
+Artifactory Group Caching: Configure Artifactory to cache LDAP group memberships with a reasonable TTL (e.g., 15–30 minutes) so that short LDAP outages do not immediately impact build authorization.
+Install Datadog Agent on crm-ubuntu327: This host has zero observability coverage. Enroll it in Datadog alongside the other CRM Ubuntu agents (crm-ubuntu265, crm-ubuntu238) for consistent fleet coverage.
+CloudBees Log Forwarding: Forward CloudBees step logs to Datadog or Splunk to enable centralized RCA without requiring direct host access.
+Exit Code 0 Failure Alerting: Investigate why CloudBees classifies a step with exit code 0 as "failed" — ensure the VerifySrc script uses non-zero exit codes for failure conditions to improve diagnostic clarity.
+LDAP Health Check in Pre-Build: Add a pre-build step that validates Artifactory connectivity and authorization before invoking VerifySrc, providing a clearer failure message when LDAP is unavailable.
+---
+12. Sources Used
+Source Type	Query Window	Evidence	Relevance
+CloudBees Job Payload	N/A (provided)	Job ID, step name "VerifySrc", exit code 0, agent host crm-ubuntu327, failure reason "Compile"	HIGH — Primary evidence source
+Datadog Logs — Artifactory (Flex)	06:00:00–06:25:00 UTC	115 LDAP sync failures for Restricted-CRMBuilds-Read-Only; first at 06:19:14Z; fleet-wide across ent-las-04/05/06/07/08/09/10	HIGH — Direct evidence of dependency failure in execution path
+Datadog Logs — 24h Baseline (Flex)	2026-07-06T00:00Z – 2026-07-07T06:00Z	Zero LDAP sync failures in prior 24 hours — confirms acute new failure	HIGH — Establishes failure as new, not chronic background noise
+Datadog Host Inventory	Current	crm-ubuntu327 NOT present. All crm-ubuntu3xx hosts absent. Artifactory ent-las-01 through -06 have Agent 7.64.1; ent-las-07 through -10 have no agent.	HIGH — Confirms telemetry gap on agent host
+Datadog Events	06:19:00–06:22:00 UTC	No events for crm-ubuntu327 or job ID	No relevant findings
+Datadog Incidents	06:18:00–06:25:00 UTC	Zero active incidents during job window	No relevant findings
+Datadog Monitors	Current	No monitors for crm-ubuntu327	Confirms monitoring gap

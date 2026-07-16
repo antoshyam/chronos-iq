@@ -1,0 +1,132 @@
+Root Cause Analysis Report
+Job ID: f179cbf2-b44b-f18f-b2e3-1ea035bf3243
+Generated: 2026-07-07 | Analyst: NOVA (AI Observability Agent)
+
+---
+1. 📋 Executive Summary
+The CloudBees job CQ2390.LA.1.0-00317-perf.apq.GPS.hy11-2_20260706_232020_232028 failed during the Make step on agent host crm-ubuntu302 with exit code 4 — a GNU Make error indicating one or more compilation sub-processes failed. The CloudBees execution context explicitly classifies the failure reason as "Compile".
+
+Agent host crm-ubuntu302 has zero telemetry coverage in Datadog — no metrics, no logs, no APM spans, and no host inventory entry were found. This means infrastructure-level root cause (CPU, memory, disk, network) on the agent itself cannot be confirmed or excluded from monitoring data alone.
+
+However, the broader CRM Linux build infrastructure (tagged mdb_service:qso.crm-linux-build-infrastructure) shows active disk alerts on /local/mnt on two Hyderabad build hosts (hyd-e160-a05-3-06, hyd-e160-a08-3-03). These are peer build agents in the same infrastructure pool. The most probable root cause is a compile-time failure — either a source code error, missing dependency, or disk/resource exhaustion on the agent — that caused one or more compiler sub-processes to exit non-zero, propagating exit code 4 to GNU Make.
+
+---
+2. 🗂️ Job Context
+Field	Value
+Job ID	f179cbf2-b44b-f18f-b2e3-1ea035bf3243
+Job Name	CQ2390.LA.1.0-00317-perf.apq.GPS.hy11-2_20260706_232020_232028
+Project	CRMBuilds
+Procedure	Build.Rel.602829
+Status	completed_error
+Outcome	error
+Build Name	CQ2390.LA.1.0-00317-perf.apq.GPS.hy11-2
+Build Status	Failed
+Failure Reason (CloudBees)	Compile
+Failed Step	Make (Step ID: f179cbf2-bfbc-f1d8-a05c-2686f9881e6f)
+Exit Code	4
+Agent Host	crm-ubuntu302
+---
+3. ⏱️ Build Timeline
+Timestamp (UTC)	Event
+2026-07-07 06:20:28	Job started (CRMBuilds / Build.Rel.602829)
+2026-07-07 06:21:19	Make step started on crm-ubuntu302
+2026-07-07 06:21:19 – 06:23:16	⚠️ CORRELATION WINDOW — Make step executing (1m 57s)
+2026-07-07 06:23:16	Make step FAILED — exit code 4
+2026-07-07 06:24:45	Job ended with status: completed_error
+---
+4. 🗺️ Execution Path Inventory
+Failed Step: Make — GNU Make build invocation
+Agent Host: crm-ubuntu302 (Ubuntu Linux, CRM build agent pool)
+Commander Host: Not directly identified — no Commander-level evidence found
+Invoked Services: Source code (SCM), compiler toolchain, build dependencies — specific URLs/repos not available from metadata
+Build Infrastructure Pool: mdb_service:qso.crm-linux-build-infrastructure (peer hosts visible in Datadog)
+---
+5. 🚨 Detected Error Codes
+Code	Source	Meaning	Evidence
+Exit Code 4	GNU Make	One or more recipe commands returned a non-zero exit status. Make propagates the highest child exit code (or 2 for its own errors). Exit code 4 indicates a child compiler/linker process failed.	CloudBees step metadata: stepId f179cbf2-bfbc-f1d8-a05c-2686f9881e6f
+failedReason: "Compile"	CloudBees executionContext	CloudBees explicitly classified the failure category as a compile failure	executionContext.failedReason field in job metadata
+---
+6. 🔍 Correlated Observations
+CloudBees
+Job f179cbf2-b44b-f18f-b2e3-1ea035bf3243 completed with status: completed_error, outcome: error
+Step Make ran for 1 minute 57 seconds (06:21:19 → 06:23:16) before failing with exit code 4
+CloudBees execution context explicitly sets failedReason: "Compile" — this is a first-party classification from the build system
+The build name pattern CQ2390.LA.1.0-00317-perf.apq.GPS.hy11-2 indicates a performance/GPS chipset build for the LA (Linux Android) platform
+Agent Host (crm-ubuntu302)
+⚠️ Agent host crm-ubuntu302 has NO telemetry coverage in Datadog.
+No metrics (CPU, memory, disk, network), no logs, no APM spans, and no host inventory entry were found. Root cause cannot be determined from monitoring data for this specific host. CloudBees step execution logs must be examined directly.
+
+Commander Host
+No Commander-specific evidence found. No Commander-related alerts or logs were identified during the correlation window.
+Finding: No relevant findings.
+Datadog — CRM Build Infrastructure Monitors
+The following active alerts were found on the CRM Linux build infrastructure pool (mdb_service:qso.crm-linux-build-infrastructure):
+
+Monitor	Status	Affected Hosts	Relevance
+SWENG|ECOMMANDER|BI|PROD - High /local/mnt partition utilization (ID: 139516185)	🔴 ALERT	hyd-e160-a05-3-06, hyd-e160-a08-3-03	Peer build agents in same pool as crm-ubuntu302. /local/mnt is the typical build workspace mount. Disk full on this path would cause compiler write failures.
+SWENG|ECOMMANDER|BI|PROD - C-Drive Utilization (ID: 103164699)	⚠️ WARN	crm-windows / hci_windows_build_servers	Windows build agents — OUT_OF_SCOPE for this Linux Make step
+SWENG|ECOMMANDER|CLOUDBEE|PROD - ZooKeeper process daemon down (ID: 115792998)	🔴 ALERT	CloudBees Commander cluster	ZooKeeper is used for CloudBees Commander HA coordination. A ZooKeeper outage could affect job scheduling but no direct evidence links this to the Make step failure.
+Disk metrics for CRM build infrastructure hosts during the correlation window: The metric query returned data for peer hosts (crm-ubuntu150, crm-ubuntu238, crm-ubuntu152, crm-ubuntutst08, crm-storcon-54, crm-awsdlhyd12) but not for crm-ubuntu302, confirming the agent is not instrumented. No disk saturation was observed on the monitored peer hosts during the window.
+
+Splunk
+Splunk was not queried in this investigation as no Splunk index was identified for CloudBees/CRM build logs in the available toolset. CloudBees step logs should be retrieved directly from the CloudBees Commander UI or agent log files.
+Finding: No relevant findings from Splunk.
+External Dependencies
+No SCM, artifact repository, or package manager failures were identified during the correlation window.
+The ZooKeeper alert on the CloudBees Commander cluster is noted but cannot be directly linked to the Make step failure without further evidence.
+Finding: No confirmed external dependency failures within the correlation window.
+---
+7. 🎯 Probable Root Cause
+Primary: Compile failure during the GNU Make step on agent crm-ubuntu302.
+
+Supporting Evidence:
+
+CloudBees executionContext.failedReason = "Compile" — first-party classification
+GNU Make exit code 4 — indicates a child compiler/linker process returned non-zero
+Step ran for ~2 minutes before failing — consistent with a partial compile that hit an error mid-build
+Active /local/mnt disk full alerts on peer build agents in the same infrastructure pool (hyd-e160-a05-3-06, hyd-e160-a08-3-03) — suggests a pool-wide disk pressure condition that may also affect crm-ubuntu302
+Cannot Confirm or Exclude (due to missing telemetry on crm-ubuntu302):
+Disk full on /local/mnt on crm-ubuntu302 specifically
+OOM (out-of-memory) kill of a compiler process
+CPU starvation causing compiler timeout
+Source code error (syntax, missing symbol, missing header)
+Missing or corrupted build dependency
+---
+8. 📊 Confidence Level
+⚠️ MEDIUM
+
+Reason: The CloudBees metadata directly classifies the failure as "Compile" and exit code 4 is consistent with a compiler sub-process failure. However, the specific cause (code error vs. infrastructure resource exhaustion) cannot be determined because crm-ubuntu302 has no Datadog telemetry coverage. The disk alerts on peer agents provide circumstantial evidence of infrastructure pressure but are not direct evidence on the failing host.
+
+---
+9. 🏗️ Infrastructure vs. Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue	POSSIBLE	Peer build agents in the same pool have active /local/mnt disk full alerts. crm-ubuntu302 has no telemetry to confirm or deny disk/memory/CPU issues.
+Code Issue	POSSIBLE	CloudBees classifies as "Compile" failure. Exit code 4 from Make is consistent with a compiler error (syntax, missing symbol, missing header, etc.).
+Mixed	POSSIBLE	Cannot be ruled out without step execution logs.
+---
+10. 🔧 Recommended Remediation
+Retrieve CloudBees step execution logs immediately — Access the Make step output from the CloudBees Commander UI for job f179cbf2-b44b-f18f-b2e3-1ea035bf3243. Look for compiler error messages (e.g., error:, undefined reference, No space left on device, Killed).
+Check disk usage on crm-ubuntu302 — SSH to the agent and run df -h /local/mnt and df -h /. The peer agents hyd-e160-a05-3-06 and hyd-e160-a08-3-03 are already alerting on /local/mnt full — crm-ubuntu302 may be in the same state.
+Check for OOM events — Run dmesg | grep -i "oom\|killed" on crm-ubuntu302 to check if the compiler was killed by the OOM killer.
+Resolve /local/mnt disk full on alerting build agents — Clean up build artifacts, object files, and intermediate outputs on hyd-e160-a05-3-06 and hyd-e160-a08-3-03 immediately. Apply the same cleanup to crm-ubuntu302.
+Investigate ZooKeeper alert — The CloudBees ZooKeeper daemon is down (Monitor ID: 115792998). Restore ZooKeeper to prevent job scheduling instability, though this is not confirmed as the direct cause of this failure.
+Retry the build — After resolving disk issues, retry the build on a clean agent to determine if the failure was transient (infrastructure) or persistent (code).
+---
+11. 🛡️ Preventive Actions
+Install Datadog Agent on crm-ubuntu302 — This host has zero observability coverage. Without metrics and logs, future failures on this agent cannot be diagnosed remotely. Deploy the Datadog Agent with system metrics and log collection.
+Implement automated build workspace cleanup — Add a pre-build or post-build step to purge stale object files and intermediate artifacts from /local/mnt on all CRM build agents.
+Add disk utilization alerting for crm-ubuntu302 — Once the Datadog Agent is deployed, create a disk monitor matching the existing SWENG|ECOMMANDER|BI|PROD - High /local/mnt partition utilization monitor pattern.
+Implement build agent health checks — Before dispatching a job to an agent, verify disk space, memory availability, and agent responsiveness.
+Stabilize ZooKeeper — Investigate and resolve the root cause of the ZooKeeper daemon outage to prevent CloudBees Commander HA instability.
+Enforce build artifact retention policies — Set maximum retention periods for build outputs on /local/mnt to prevent disk exhaustion across the build agent pool.
+---
+12. 📚 Sources Used
+Source Type	Query Window	Evidence	Relevance
+CloudBees Job Metadata	N/A (provided)	Job ID, step name, exit code 4, agent host, failedReason=Compile	HIGH — Primary evidence
+Datadog Logs (Flex)	06:20:00–06:25:00 UTC	0 results for crm-ubuntu302, job ID, build name	No relevant findings — agent not instrumented
+Datadog Host Inventory	Current	crm-ubuntu302 not found in host inventory	Confirms no Datadog Agent installed on agent host
+Datadog Metrics	06:18:00–06:25:00 UTC	No CPU/memory/disk data for crm-ubuntu302; peer host data available	Confirms telemetry gap; peer hosts show normal CPU
+Datadog Monitors	Current state	Active /local/mnt disk alerts on hyd-e160-a05-3-06, hyd-e160-a08-3-03; ZooKeeper down alert	MEDIUM — Circumstantial infrastructure evidence
+Datadog Events	06:18:00–06:25:00 UTC	No events for crm-ubuntu302 or CRMBuilds job	No relevant findings
+Datadog Incidents	05:00–07:00 UTC	0 incidents matching crm-ubuntu302 or CRMBuilds	No relevant findings
+Datadog APM Spans	06:20:00–06:25:00 UTC	0 spans from crm-ubuntu302	No relevant findings

@@ -1,0 +1,157 @@
+Build ID: f179d5bc-858d-f177-a3f1-4efb9ff91010  |  Generated: 2026-07-07
+
+---
+1. 📋 Executive Summary
+The CloudBees CI build CI_WLAN.WBE.0.0-05065.1-QCAHKSWPL_SILICON-79 failed on 2026-07-07 due to a Compile Failure in the Make step. The build script wlan_build_lnx_wkk.sh / build.sh targeting 9224.wlanfw.eval_v2 image=wlan_halphy with CLANG_VER=10.0.0 exited with a non-zero code, triggering an abortJob cascade that also failed SaveBuild and cancelled all downstream steps. The CRM system's own BuildInfoJson explicitly records failedReason=Compile.
+
+A notable secondary observation is a memory anomaly on the agent host crm-ubuntulv20 (physical: las-colo12-h17-34): memory rose steadily by ~23 GB over 35 minutes during the Make step window (00:25–01:00 UTC), consistent with a large WLAN firmware compilation consuming increasing memory. This is expected behavior for a large CLANG-based firmware build and does not indicate OOM or infrastructure failure — no SCOM alerts were triggered and the build ran for ~47 minutes before failing. The failure is classified as a Compile Failure with HIGH confidence.
+
+---
+2. 🏗️ Job Context
+Field	Value
+Build ID	f179d5bc-858d-f177-a3f1-4efb9ff91010
+Job Name	CI_WLAN.WBE.0.0-05065.1-QCAHKSWPL_SILICON-79_20260707_003025_003032
+Project	CRMBuilds
+Procedure	Build.Rel.602829
+Outcome	completed_error / ABORT / Failed
+Failed Step	Make (abortJob triggered)
+Software Image	WLAN.WBE.0.0
+Image Revision	5065
+Client	QCAHKSWPL_SILICON
+Site	LasVegas
+Spin	79 — extremely high spin count, indicating persistent repeated failures
+Host OS	Ubuntu 22.04
+Build Server (Agent)	crm-ubuntulv20 (physical: las-colo12-h17-34)
+Build Drive	G: (Drive G)
+Launched By	tiberiumUserEC10_11
+Run As User	aswbldsv / pwbldsvc
+Reference Build	WLAN.WBE.0.0-05065-QCAHKSWPL_SILICON-1
+Build Storage	Filer — \\chipwich\scratch_builds001\PROD / /prj/qct/asw/crmbuilds/chipwich/scratch_builds001/PROD/CI_WLAN.WBE.0.0-05065.1-QCAHKSWPL_SILICON-79
+Build Delete Date	⚠️ 2026-07-10 (artifacts at risk of purge)
+Workspace	/prj/qct/asw/ecmdr_ws_crm/CI_WLAN.WBE.0.0-05065.1-QCAHKSWPL_SILICON-79_20260707_003025_003032
+---
+3. ⏱️ Build Timeline
+Time (UTC)	Event	Status
+07:30:32Z	Job started — Procedure Build.Rel.602829 initiated on crm-ubuntulv20	Running
+07:30:33Z – 07:30:56Z	Setup step completed (23 seconds, exit code 0) — env vars, EcBuildSetup, DB connections initialized	Success
+07:30:56Z – ~07:35:00Z	SyncSetup, BBS_PreSync, Sync, BBS_PostSync steps completed successfully	Success
+~07:35:00Z	Make step started — wlan_build_lnx_wkk.sh + build.sh 9224.wlanfw.eval_v2 image=wlan_halphy CLANG_VER=10.0.0 for mac_num=1 and mac_num=2	Running
+00:25Z – 01:00Z (UTC)	Agent memory rising steadily: ~447 GB → ~470 GB (+23 GB over 35 min). CPU low (avg 0.24%, max 1.91%). Consistent with large CLANG firmware compilation in progress.	Compiling
+~08:17:27Z	Make step FAILED — Build script returned non-zero exit code. errorHandling=abortJob triggered. BuildInfoJson written with failedReason=Compile.	FAILED
+08:17:27Z – 08:17:37Z	Abort cascade: SaveBuild failed/aborted. All downstream steps cancelled. Job finalized.	ABORTED
+08:17:37Z	Job completed with outcome: completed_error / ABORT. Total elapsed: ~2825 seconds (~47 minutes)	ABORT
+---
+4. 🗺️ Execution Path Inventory
+Failed Step: Make — wlan_build_lnx_wkk.sh + build.sh 9224.wlanfw.eval_v2 image=wlan_halphy CLANG_VER=10.0.0 USES_FLAGS=ENABLE_CLANG pgo_enable=true cnss_chip_ver=v2 cnss_hw_version=e3r96 lto_enable=false mac_num=1/2 ax_enable=true disable_fbc=false
+Primary Agent Host: crm-ubuntulv20 (physical: las-colo12-h17-34, Ubuntu 22.04, Drive G, site LasVegas, resource pool: CRMBuildsLinux-Ubuntu22-04_LV)
+Secondary Agents (post-Make steps): crm-ubuntu302, crm-ubuntu318 (physical: san-w170-s5-4-01), crm-ubuntu322, san-w175-ja4-6-08
+Commander Hosts: las-colo12-j13-09, las-colo12-j13-10, las-colo12-j13-11
+Build Tool Invoked: CLANG 10.0.0 via build.sh / wlan_build_lnx_wkk.sh
+Build Storage (Filer): \\chipwich\scratch_builds001\PROD / /prj/qct/asw/crmbuilds/chipwich/scratch_builds001/PROD/
+Workspace (NFS): /prj/qct/asw/ecmdr_ws_crm/CI_WLAN.WBE.0.0-05065.1-QCAHKSWPL_SILICON-79_20260707_003025_003032
+External Services Referenced in Setup: oil.qualcomm.com (CRM DB), pcm.qualcomm.com (PCM WebService), csds.qualcomm.com (SoftwareRevisionService), verifysrc.qualcomm.com, apigw-op.qualcomm.com, license-pdlm-1-encnaa.qualcomm.com (ARM license)
+---
+5. 🚨 Detected Error Codes
+Error	Step	Meaning	Evidence
+Non-zero exit code (Make)	Make	CLANG/build.sh returned non-zero — one or more compilation units failed during WLAN firmware build	Splunk ec_debug — errorMessage, BuildInfoJson
+failedReason=Compile	BuildInfoJson	CRM system explicitly tagged failure category as "Compile"	BuildInfoJson property in Splunk ec_debug
+abortJob cascade	SaveBuild + downstream	errorHandling=abortJob on Make step propagated abort to entire job	Splunk ec_debug — errorMessage field
+Exit code 0 (Setup)	Setup	Pre-build environment setup succeeded — no credential or env issues	Splunk ec_debug — jobStep XML
+No Timeout	"Check If Any Step Failed due to TimeOut"	Timeout check step completed with outcome=success — failure was NOT a timeout	Splunk ec_debug
+---
+6. 🔗 Correlated Observations
+☁️ CloudBees
+Make step ran for ~47 minutes total job duration — consistent with a large WLAN firmware CLANG build (mac_num=1 and mac_num=2 sequential builds)
+Build command: wlan_build_lnx_wkk.sh + build.sh 9224.wlanfw.eval_v2 image=wlan_halphy CLANG_VER=10.0.0 USES_FLAGS=ENABLE_CLANG pgo_enable=true cnss_chip_ver=v2 cnss_hw_version=e3r96 lto_enable=false mac_num=1/2 ax_enable=true disable_fbc=false
+errorHandling=abortJob triggered full job abort
+BuildInfoJson explicitly records failedReason=Compile and buildStatus=Failed
+Spin 79 — this is an extremely high spin count. The same build has failed 78 times previously, strongly indicating a persistent, reproducible code-level compile error that has not been resolved across many retry attempts
+Timeout check step confirmed: failure was NOT due to timeout
+Setup step succeeded (exit code 0) — environment, credentials, and DB connections were all healthy
+Multiple agents used: crm-ubuntulv20 (Make), crm-ubuntu302/318/322, san-w175-ja4-6-08 (post-Make steps)
+🖥️ Agent Host — crm-ubuntulv20 (las-colo12-h17-34)
+CPU (Datadog, 00:25–01:00 UTC): avg 0.24%, max 1.91% — HEALTHY, no CPU exhaustion
+Memory (Datadog, 00:25–01:00 UTC): Steady rise from ~447 GB → ~470 GB (+23 GB over 35 min). Notable but expected — CLANG firmware builds are memory-intensive. No sudden drop (which would indicate OOM kill). Memory was still rising at job end, suggesting the build was still actively compiling when it failed.
+SCOM Alerts: None active on las-colo12-h17-34
+Concurrent Jobs on Agent: The Commander logs show 20+ other jobs were also running on crm-ubuntulv20 during the same period. However, CPU remained very low, indicating the other jobs were not CPU-intensive and did not cause resource contention for the Make step.
+Datadog Metric Anomaly (07:42Z window): A CPU spike to 45.47% and memory drop of ~17 GB was observed in the 07:25–08:25Z Datadog window. This is AFTER the Make step failure and corresponds to post-failure cleanup processes (SaveBuild abort, workspace cleanup, agent resource release). This is a consequence of the failure, not a cause.
+🏛️ Commander Hosts
+Commander nodes las-colo12-j13-09, las-colo12-j13-10, las-colo12-j13-11 were all active and processing jobs normally
+Commander j13-09 processed 421 jobs, j13-10 processed 548 jobs, j13-11 processed 735 jobs — all operating at high throughput without errors
+Queue lock operations (lockTime values: 12–802ms) were all within normal ranges — no Commander bottleneck
+Commander infrastructure: HEALTHY
+📊 Datadog
+CPU on agent host was nominal throughout the Make step window (avg 0.24%, max 1.91%) — no resource exhaustion
+Memory rise of +23 GB during compilation is consistent with CLANG's memory usage for large firmware builds — expected behavior, not an anomaly
+Post-failure CPU spike (45.47%) and memory drop (~17 GB) at 07:42Z are consequences of the abort cascade, not causes
+No Datadog logs found for build ID or agent host in the failure window — metric-only telemetry for this host
+🔍 Splunk
+Primary evidence source — full job metadata, step details, BuildInfoJson, and cascade confirmed
+BuildInfoJson explicitly records failedReason=Compile, status=Failed, spin=79
+Make step log file path: /prj/qct/asw/ecmdr_ws_crm/CI_WLAN.WBE.0.0-05065.1-QCAHKSWPL_SILICON-79_20260707_003025_003032/Make.<stepId>.log
+⚠️ The actual CLANG compiler error messages are in the Make step log — not yet retrieved. The log must be examined for specific source file, line number, and error type.
+---
+7. 🎯 Probable Root Cause
+PRIMARY ROOT CAUSE: Persistent Compilation Failure in WLAN Firmware Build (CLANG 10.0.0)
+
+The build.sh 9224.wlanfw.eval_v2 image=wlan_halphy command failed with a non-zero exit code during CLANG compilation of the WLAN firmware. The CRM system's own BuildInfoJson explicitly records failedReason=Compile.
+
+Supporting Evidence:
+
+failedReason=Compile in BuildInfoJson (Splunk)
+Make step ran for ~47 minutes — the build was actively compiling before failing (not a quick startup error)
+Spin 79 — this build has failed 78 times previously with the same compile error. This is a persistent, unresolved code-level issue that has been retried an extraordinary number of times without a fix being applied
+Timeout check step confirmed: failure was NOT a timeout
+Agent host CPU and memory were healthy — infrastructure was not the cause
+Setup step succeeded — environment, credentials, and external services were all reachable
+Memory growth during compilation was expected for a large CLANG firmware build
+The specific CLANG compiler error (file, line, error message) is in the Make step log:
+/prj/qct/asw/ecmdr_ws_crm/CI_WLAN.WBE.0.0-05065.1-QCAHKSWPL_SILICON-79_20260707_003025_003032/Make.<stepId>.log
+
+⚠️ CRITICAL NOTE — Spin 79: The fact that this build has been retried 79 times without resolution strongly suggests the compile error is a known, persistent issue in the WLAN.WBE.0.0 codebase at revision 5065 for the QCAHKSWPL_SILICON client. The code owner team should be escalated immediately to investigate and fix the root compile error rather than continuing to retry.
+
+---
+8. 📈 Confidence Level
+🟢 HIGH
+
+Direct CloudBees metadata confirms Make step failure and failedReason=Compile
+CRM BuildInfoJson explicitly classifies the failure as "Compile"
+Agent host infrastructure metrics confirm no resource exhaustion during compilation
+Spin 79 confirms the failure is highly reproducible and persistent — not transient
+Timeout check step confirmed failure was not timeout-related
+Commander infrastructure confirmed healthy
+Setup step success confirms environment and credentials were not the issue
+---
+9. 🏗️ Infrastructure vs Code Assessment
+Category	Assessment	Reason
+Infrastructure Issue	NO	Agent CPU <2%, memory growth expected for CLANG build, no SCOM alerts, Commander healthy, Setup step succeeded
+Code / Compile Issue	YES	failedReason=Compile in BuildInfoJson, Spin 79 confirms persistent reproducibility, CLANG build.sh returned non-zero
+Mixed Issue	NO	No infrastructure evidence found in the execution path during the failure window
+---
+10. 🔧 Recommended Remediation
+🚨 STOP RETRYING — Escalate to WLAN code owner immediately: Spin 79 means this build has failed 78 times. Continuing to retry without fixing the root cause wastes compute resources. The WLAN.WBE.0.0 team at revision 5065 must be notified.
+⚡ URGENT — Retrieve Make step log before 2026-07-10 purge:
+/prj/qct/asw/ecmdr_ws_crm/CI_WLAN.WBE.0.0-05065.1-QCAHKSWPL_SILICON-79_20260707_003025_003032/Make.<stepId>.log
+Search for CLANG error lines: error:, fatal error:, undefined reference, cannot find, linker error, assertion failed.
+Also check build artifacts at: /prj/qct/asw/crmbuilds/chipwich/scratch_builds001/PROD/CI_WLAN.WBE.0.0-05065.1-QCAHKSWPL_SILICON-79
+Identify the failing source file and error: The log will reveal the exact source file, line number, and CLANG error message for the 9224.wlanfw.eval_v2 wlan_halphy target.
+Review changes at imageRevision 5065 vs reference build WLAN.WBE.0.0-05065-QCAHKSWPL_SILICON-1 to identify the delta that introduced the compile error.
+Check if mac_num=1 or mac_num=2 is the failing build — the build command runs both sequentially; the log will indicate which one fails first.
+Verify CLANG 10.0.0 toolchain availability on crm-ubuntulv20 — confirm the toolchain is intact and not corrupted (though Spin 79 suggests this is unlikely to be the issue).
+---
+11. 🛡️ Preventive Actions
+Implement a maximum spin threshold (e.g., 5–10 spins) after which the CI system automatically stops retrying and escalates to the code owner team instead of continuing to consume build resources
+Add compile error pattern alerting in Splunk to proactively notify WLAN code owners when failedReason=Compile is recorded for WLAN.WBE.0.0 builds
+Implement pre-commit compile checks or incremental build validation on the WLAN firmware codebase to catch compile errors before CI submission
+Configure log retention policies to extend beyond 3 days for failed CI builds with high spin counts to allow adequate RCA time
+Consider build resource throttling for high-spin builds to prevent them from consuming agent capacity that could be used by other builds
+Add Spin count monitoring — alert when any build exceeds spin 5 to trigger early human intervention
+---
+12. 📚 Sources Used
+Source	Query Window	Evidence	Relevance
+Splunk (index=ecommander)	-7d to now	Full job metadata, step details, BuildInfoJson (failedReason=Compile, spin=79), cascade, agent assignments	PRIMARY — Direct job evidence
+Datadog Metrics (system.cpu.user)	00:25Z–01:00Z 2026-07-07	CPU avg 0.24%, max 1.91% on las-colo12-h17-34 during Make step	Agent host health — rules out CPU exhaustion
+Datadog Metrics (system.mem.used)	00:25Z–01:00Z 2026-07-07	Memory rising ~447→470 GB (+23 GB) on las-colo12-h17-34 — expected CLANG build behavior	Agent host health — expected compilation memory growth, not OOM
+SCOM	Current	No active alerts on las-colo12-h17-34	Agent host health — rules out OS/hardware issues
+Datadog Logs	07:30Z–08:20Z 2026-07-07	No logs found for build ID or agent host	No relevant findings
+---

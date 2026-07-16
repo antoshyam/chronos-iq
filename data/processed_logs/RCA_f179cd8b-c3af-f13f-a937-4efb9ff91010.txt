@@ -1,0 +1,118 @@
+CloudBees Job: f179cd8b-c3af-f13f-a937-4efb9ff91010
+1. Executive Summary
+Job Aurora.LA.3.1-00150-STD.PROD-2 (Project: CRMBuilds, Procedure: Build.Rel.602829) failed during the VerifySrc step on agent host crm-ubuntu359 between 06:33:38Z – 06:34:50Z on 2026-07-07. The build outcome was classified as Compile failure.
+
+The probable root cause is a widespread CIFS/SMB authentication failure against the QCDFS shared file server (\\qcdfs), which began at or before 06:00:00Z and persisted until at least 07:29:59Z. A total of 69,624 CIFS SessSetup = -13 (EACCES) errors were recorded across 23 build hosts during this window. The VerifySrc step — which depends on reading source files from QCDFS-mounted shares — could not authenticate to the file server, causing source verification to fail and the build to report a Compile failure.
+
+Agent host crm-ubuntu359 has no direct Datadog telemetry coverage (no agent registered, no metrics, no logs). However, the QCDFS failure is confirmed on the same class of build hosts (fra-aci-ubld*) and is consistent with the failure mode and timing.
+
+2. Job Context
+Job ID: f179cd8b-c3af-f13f-a937-4efb9ff91010
+Job Name: Aurora.LA.3.1-00150-STD.PROD-2_20260706_233147_233154
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: VerifySrc
+Failed Reason (Build): Compile
+Agent Host: crm-ubuntu359
+Step Exit Code: 0 (process exited cleanly — failure was detected by step logic, not a crash)
+3. Build Timeline
+06:00:00Z — QCDFS CIFS SessSetup = -13 errors begin (first recorded in telemetry)
+06:31:54Z — CloudBees Job starts on crm-ubuntu359
+06:33:38Z — VerifySrc step begins
+06:33:38Z – 06:34:50Z — QCDFS CIFS authentication failures actively occurring across build farm (69,624 total errors in 06:00–07:30 window)
+06:34:50Z — VerifySrc step ends (duration: ~72 seconds)
+06:38:05Z — Job ends with status: completed_error
+07:29:59Z — Last recorded QCDFS CIFS error in telemetry window
+4. Execution Path Inventory
+Failed Step: VerifySrc (stepId: f179cd8b-cf6f-f1bc-be4a-1ea035bf3243)
+Agent Host: crm-ubuntu359 — No Datadog telemetry coverage
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Invoked File Service: \\QCDFS.qualcomm.com — CIFS/SMB shared file server hosting CRM build sources (paths: /PRJ/qct/asw/crmbuilds, /crmbuilds/builds*)
+SCM (Gerrit): Active git-upload-pack operations observed during step window for compile framework repos (/platform/frameworks/compile/libbcc, /platform/frameworks/compile/slang, /platform/frameworks/compile/mclinker) — these completed successfully (status 0)
+5. Detected Error Codes
+CIFS VFS: \\qcdfs Send error in SessSetup = -13
+Error Code: -13 = EACCES (Permission Denied / Authentication Failure)
+Protocol: SMB/CIFS session setup (Kerberos or NTLM authentication phase)
+Target Server: \\QCDFS.qualcomm.com
+First Occurrence: 2026-07-07T06:00:00Z
+Last Occurrence: 2026-07-07T07:29:59Z
+Total Count: 69,624 log entries
+Affected Hosts: 23 confirmed (fra-aci-ubld225–430, drekar-sd-*, drekar-lv-*)
+Evidence Source: Datadog Logs (flex tier), service: aci_syslog
+Step Exit Code: 0
+The VerifySrc step process exited with code 0 (no OS-level crash). The failure was detected by the step's own verification logic — consistent with a "source not found / not accessible" condition rather than a compiler crash.
+6. Correlated Observations
+CloudBees
+Job f179cd8b failed at VerifySrc step with exit code 0 and build outcome "Compile".
+Step duration was ~72 seconds (06:33:38 – 06:34:50), suggesting the step ran to completion but found source verification failed.
+No other jobs on crm-ubuntu359 could be identified due to absence of telemetry on that host.
+Agent Host (crm-ubuntu359)
+⚠️ Agent host crm-ubuntu359 has no Datadog telemetry coverage.
+No CPU, memory, disk, or network metrics are available. No logs from this host were found in Datadog. Root cause cannot be confirmed from monitoring data alone for this specific host. CloudBees step execution logs must be examined directly.
+
+Commander Host
+No evidence of Commander-side failure. Commander is not implicated in this failure.
+Datadog — QCDFS File Server (Key Finding)
+69,624 CIFS SessSetup = -13 (EACCES) errors recorded against \\QCDFS.qualcomm.com between 06:00Z and 07:30Z.
+Errors began before the job started (06:00Z vs job start 06:31Z).
+Errors were active during the entire VerifySrc step window (06:33:38 – 06:34:50Z).
+Affected 23 distinct build hosts simultaneously — indicating a server-side authentication/credential issue, not a per-host problem.
+Top affected hosts: fra-aci-ubld429 (4,816 errors), fra-aci-ubld229 (4,816), fra-aci-ubld228 (4,810).
+Service owner: arriverci.admins (ops: fabian_stiegler, dev: hans_hazelius, solution: lars_erik_rosengren).
+QCDFS paths relevant to CRMBuilds: /PRJ/qct/asw/crmbuilds, /crmbuilds/builds678, /crmbuilds/builds709, /crmbuilds/builds904, /crmbuilds/builds907.
+Datadog — SCM / Gerrit
+Gerrit git-upload-pack operations for compile framework repos (libbcc, slang, mclinker) completed successfully (status 0) during the VerifySrc window.
+SCM is not implicated in the failure.
+Splunk
+No Splunk data was queried in this investigation (Datadog flex logs provided sufficient coverage).
+External Dependency
+QCDFS.qualcomm.com — CIFS file server. Authentication failures (EACCES) are the primary correlated finding. No formal incident was declared in Datadog Incident Management for this outage.
+7. Probable Root Cause
+QCDFS CIFS Authentication Failure (EACCES / SessSetup = -13)
+
+The VerifySrc step on agent crm-ubuntu359 failed because the build agent could not authenticate to the \\QCDFS.qualcomm.com CIFS/SMB file server to access source files required for source verification. The Linux kernel CIFS client returned error -13 (EACCES) during the SMB session setup phase, indicating an authentication or credential failure (likely expired Kerberos ticket, NTLM credential issue, or a server-side authentication service disruption).
+
+This is supported by:
+
+69,624 identical CIFS SessSetup = -13 errors across 23 build hosts in the 06:00–07:30Z window
+Errors were active before, during, and after the VerifySrc step
+The simultaneous failure across all build hosts rules out a per-host issue
+QCDFS hosts the CRMBuilds source paths that VerifySrc must access
+Step exit code 0 confirms the process ran but found verification failed (not a crash)
+Build failure reason is classified as "Compile" — consistent with missing/inaccessible source files
+8. Confidence Level
+MEDIUM
+
+Reason: The QCDFS CIFS failure is strongly correlated with the job failure window and is the most plausible root cause. However, confidence is capped at MEDIUM because:
+
+Agent host crm-ubuntu359 has no direct Datadog telemetry — the CIFS error was not observed on this specific host, only on the same class of build hosts
+The step exit code is 0, which is unusual for a hard infrastructure failure — the step's internal logic may have a different failure path
+CloudBees step execution logs from crm-ubuntu359 were not accessible for direct confirmation
+9. Infrastructure vs Code Assessment
+Infrastructure Issue: YES
+Code Issue: NO
+Mixed: NO
+Reason: The failure is attributed to a shared file server (QCDFS) authentication outage affecting the entire build farm. No compiler errors, syntax errors, or code-level failures were identified. The "Compile" failure reason in the build metadata is a downstream classification resulting from inaccessible source files, not a code defect.
+
+10. Recommended Remediation
+Investigate QCDFS authentication failure: Contact the QCDFS/storage team and arriverci.admins to determine what caused the CIFS SessSetup = -13 errors starting at 06:00Z on 2026-07-07. Check for expired Kerberos keytabs, NTLM credential rotation, or AD/LDAP authentication service disruption.
+Verify QCDFS mount on crm-ubuntu359: SSH to the agent host and run mount | grep qcdfs and ls /PRJ/qct/asw/crmbuilds to confirm the share is now accessible.
+Re-run the failed job: Once QCDFS access is confirmed restored, re-trigger job f179cd8b (Build.Rel.602829 / Aurora.LA.3.1-00150-STD.PROD-2).
+Review step exit code logic: Investigate why VerifySrc exits with code 0 on a file access failure — this may mask the true error and complicate future diagnosis.
+Install Datadog agent on crm-ubuntu359: The host has no telemetry coverage. Install the Datadog agent to enable CPU, memory, disk, and log collection for future investigations.
+11. Preventive Actions
+QCDFS health monitoring: Create a Datadog monitor for CIFS SessSetup = -13 errors on build hosts. Alert when count exceeds threshold within a 5-minute window.
+Kerberos/NTLM credential lifecycle management: Implement automated renewal of Kerberos keytabs and service account credentials used by build agents to mount QCDFS shares.
+Pre-flight QCDFS connectivity check: Add a CloudBees pre-step that validates QCDFS mount accessibility before starting VerifySrc. Fail fast with a clear error message if the share is unavailable.
+Datadog agent deployment: Ensure all CloudBees build agents (including crm-ubuntu359) have Datadog agents installed and reporting metrics and logs.
+Incident declaration: The QCDFS outage (69,624 errors, 23 hosts, 90+ minutes) was not declared as a formal incident. Implement auto-incident creation for widespread CIFS authentication failures.
+12. Sources Used
+Source Type	Query Window	Evidence	Relevance
+Datadog Logs (flex)	06:00Z – 07:30Z	69,624 CIFS SessSetup = -13 errors on 23 build hosts targeting \\QCDFS	HIGH — Direct evidence of file server authentication failure during job window
+Datadog Logs (flex)	06:33Z – 06:35Z	Gerrit git-upload-pack operations for compile repos completed successfully (status 0)	MEDIUM — Confirms SCM is not the failure cause
+Datadog Logs (flex)	06:31Z – 06:40Z	CIFS mount attempts to QCDFS and snowcone from drekar nodes	LOW — Drekar nodes are OUT_OF_SCOPE; confirms QCDFS is a shared dependency
+Datadog Metrics	06:30Z – 06:40Z	No data returned for crm-ubuntu359	N/A — Agent host has no telemetry coverage
+Datadog Infrastructure	Current	crm-ubuntu359 not registered in Datadog host inventory	Confirms absence of monitoring on agent host
+Datadog Incidents	05:00Z – 08:00Z	No incidents declared for QCDFS or CRM	Confirms no formal incident was raised despite widespread failure
+CloudBees Metadata	Job payload	Job ID, step name, exit code, agent host, timestamps, failure reason	HIGH — Primary job context

@@ -1,0 +1,172 @@
+Root Cause Analysis Report
+CloudBees Job: f179cc58-200a-f193-933e-1ea035bf3243
+Generated: 2026-07-07 | Analyst: NOVA (Next-Generation Observability Virtual Agent)
+
+1. Executive Summary
+Job CI_SAIL.SI.1.1-18301.1-AU.LEMANS-1 (Project: CRMBuilds, Procedure: Build.Rel.602829) failed during the Make step on agent host qctcrmbld52 (Windows Server 2022) between 06:29:43Z – 09:23:32Z on 2026-07-07 — a duration of 2 hours 53 minutes 49 seconds. The build outcome was classified as a Compile failure with exit code 4.
+
+This job is fundamentally different from the three previous VerifySrc failures (Aurora, Kobuk WKK-1, Kobuk AB.WKK-1). It ran on a different agent type (Windows vs. Linux), failed at a different step (Make vs. VerifySrc), exited with a different exit code (4 vs. 0), ran for nearly 3 hours before failing, and is not related to the QCDFS Kerberos outage.
+
+The agent host qctcrmbld52 is a Windows Server 2022 machine with a Datadog agent installed (v7.52.1), providing metrics coverage. However, no logs from this host are available in Datadog — the Datadog agent is not configured to collect Windows Event Logs or application logs from this host.
+
+Agent host metrics confirm the host was healthy throughout the entire Make step: CPU averaged 5.3% (peak 14%), memory used only 10% of 204 GB, disk at a flat 47.1%, and zero I/O wait. No resource exhaustion occurred on the agent host.
+
+The probable root cause is a code-level compile failure in the LEMANS-1 kernel/firmware build. Exit code 4 from GNU Make indicates a child process (compiler/linker/assembler) returned a non-zero exit code, meaning one or more compilation units failed. The most likely candidates, based on correlated evidence from a parallel GitHub Actions pipeline building the same LEMANS-1 target, are:
+
+Pre-existing DTS (Device Tree Source) structural errors in lemans-evk-camera-sensor.dtsi and lemans-camera-sensor.dtsi — 16 graph_port unit address errors across 4 GMSL deserializer nodes (port@2/port@3 should be port@0/port@1)
+Additional DTS prerequisite failures in lemans-evk-camx.dtbo and lemans-rtss-mb.dtbo — spi_bus_reg, i2c_bus_reg, pci_device_bus_num, pci_device_reg all failing prerequisite reg_format
+A recent commit to the LEMANS-1 kernel source (SHA: ee11e490952f61d72e5f85d5cb82209c532a88e9, committer: Salendarsingh Gaud, 2026-07-03) that enabled Storage topic branches — potentially introducing a breaking change
+⚠️ Important Scope Note: The GitHub Actions pipeline evidence is from a separate, independent CI system (qualcomm-linux/kernel-config, qualcomm-linux/qcom-deb-images) building the same LEMANS-1 target. All GitHub Actions jobs completed with status: success. This evidence is used only to identify known DTS issues in the LEMANS-1 codebase — it does not directly prove the CloudBees Make step failure cause. The CloudBees step execution logs on qctcrmbld52 must be examined directly for definitive confirmation.
+
+2. Job Context
+Job ID: f179cc58-200a-f193-933e-1ea035bf3243
+Job Name: CI_SAIL.SI.1.1-18301.1-AU.LEMANS-1_20260706_232312_232318
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: Make
+Failed Reason (Build): Compile
+Agent Host: qctcrmbld52 (Windows Server 2022 Standard, Datadog Agent v7.52.1)
+Step Exit Code: 4 — GNU Make exit code 4 = a child process invoked by Make returned a non-zero exit code (compiler/linker/assembler failure)
+Step Duration: 2 hours 53 minutes 49 seconds (06:29:43Z – 09:23:32Z)
+Relationship to Previous Jobs: UNRELATED — different agent, different step, different exit code, different failure mechanism. Not caused by QCDFS Kerberos outage.
+3. Build Timeline
+Time (UTC)	Event	Source
+06:23:18Z	CloudBees Job f179cc58 starts on qctcrmbld52	CloudBees Metadata
+06:29:43Z	Make step begins — kernel/firmware compilation for LEMANS-1 target starts	CloudBees Metadata
+06:30:00Z	CPU: 5–10%, Memory: 19.9 GB / 204 GB (10%), Disk: 47.1% — host healthy	Datadog Metrics
+06:44:41Z – 06:46:39Z	GitHub Actions parallel pipeline: DTS compilation warnings for LEMANS-1 — graph_port unit address errors in lemans-evk-camera-sensor.dtsi and lemans-camera-sensor.dtsi (16 warnings, 4 GMSL deserializer nodes)	Datadog Logs (github-actions)
+07:27:58Z – 07:27:59Z	GitHub Actions: Same DTS warnings repeat — confirms pre-existing, persistent DTS structural issues in LEMANS-1 codebase	Datadog Logs (github-actions)
+07:30:00Z – 07:56:00Z	Memory peaks at 21.72 GB (still only 10.6% of total). Write IOPS peaks at 151 req/s — active compilation output. Network receive spikes to 16.4 MB/s — dependency downloads or artifact fetching	Datadog Metrics
+07:47:00Z	Network send spike: 97.2 MB peak — possible artifact upload or large data transfer	Datadog Metrics
+07:52:01Z	GitHub Actions parallel pipeline: DTS warnings repeat + additional reg_format prerequisite failures in lemans-evk-camx.dtbo and lemans-rtss-mb.dtbo	Datadog Logs (github-actions)
+08:05:00Z	Anomalous disk read spike: 408.8 req/s (vs. normal ~0.01 req/s) — possible large header/dependency read or toolchain cache miss	Datadog Metrics
+08:13:00Z	CPU peaks at 14% (highest in window), network receive at 17.2 MB/s — most intensive compilation phase	Datadog Metrics
+09:23:32Z	Make step FAILS — exit code 4 (child process failure). After 2h 53m 49s of compilation.	CloudBees Metadata
+09:28:52Z	Job ends with status: completed_error	CloudBees Metadata
+4. Execution Path Inventory
+Failed Step: Make (stepId: f179cc58-2c18-f12c-85b0-1ea035bf3243)
+Agent Host: qctcrmbld52 — Windows Server 2022 Standard, Datadog Agent v7.52.1 installed. ⚠️ Metrics available; logs NOT available in Datadog (Windows Event Log collection not configured).
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Build Target: LEMANS-1 (AU variant) — ARM64 kernel/firmware build for Qualcomm LEMANS platform
+Build Tool: GNU Make (exit code 4 = child process failure)
+Source Repository: qualcomm-linux/kernel-config (GitHub) — LEMANS-1 kernel source including DTS files
+Last Known Commit: SHA ee11e490952f61d72e5f85d5cb82209c532a88e9 — "ci: Enable Storage topic branches for pre-merge rootfs generation" (Nitin Rawat / Salendarsingh Gaud, 2026-07-03)
+5. Detected Error Codes
+🔴 Primary: Make Exit Code 4
+Exit Code: 4
+Meaning: GNU Make exit code 4 = a child process (compiler, linker, assembler, or sub-make) returned a non-zero exit code. Make itself ran successfully but one or more compilation units failed.
+Implication: This is a code-level compile failure, not an infrastructure failure. The build tool ran for 2h 53m before a compilation unit failed.
+Evidence Source: CloudBees job metadata
+🟡 Correlated: DTS graph_port Unit Address Errors (Warnings — Not Direct Cause)
+Error Pattern: Warning (graph_port): graph node unit address error, expected "0" / expected "1"
+Affected Files:
+arch/arm64/boot/dts/qcom/lemans-evk-camera-sensor.dtsi — lines 56, 63, 349, 357, 608, 616, 835, 843
+arch/arm64/boot/dts/qcom/lemans-camera-sensor.dtsi — lines 56, 64, 178, 186, 300, 308, 422, 430
+Affected Nodes: qcom,cam-gmsl-deserializer0 through deserializer3 under cci0@ac13000 through cci3@ac16000
+Root Issue: port@2 and port@3 should be renumbered to port@0 and port@1 respectively in both DTS files for all 4 GMSL deserializer nodes
+Classification: Warnings only in the GitHub Actions pipeline (which completed successfully). However, if the CloudBees Make step uses stricter DTC flags (e.g., -Werror), these warnings would be promoted to errors and cause Make exit code 4.
+Evidence Source: Datadog Logs (github-actions, service: github-actions, host: github.com) — OUT_OF_SCOPE for direct execution path but relevant as codebase evidence
+🟡 Correlated: DTS reg_format Prerequisite Failures (Warnings — Not Direct Cause)
+Error Pattern: Warning (spi_bus_reg/i2c_bus_reg/pci_device_bus_num/pci_device_reg): Failed prerequisite 'reg_format'
+Affected Files: lemans-evk-camx.dtbo, lemans-rtss-mb.dtbo
+Classification: Same as above — warnings in GitHub Actions, potential errors under stricter DTC flags
+Evidence Source: Datadog Logs (github-actions)
+6. Correlated Observations
+CloudBees
+Make step ran for 2 hours 53 minutes 49 seconds before failing — indicating the build progressed substantially before hitting the failing compilation unit. This is consistent with a late-stage compile error in a large codebase (e.g., a specific driver, module, or DTS file compiled late in the dependency chain).
+Exit code 4 confirms a child process failure — the Make orchestrator itself did not crash.
+Build failure reason "Compile" is correctly classified for this job (unlike the three VerifySrc jobs where "Compile" was a misclassification).
+Agent Host (qctcrmbld52) — Metrics
+CPU: Average 5.3% (user 3.18% + system 2.11%), peak 14% at 08:13Z. ✅ Not a contributing factor.
+Memory: Average 20.69 GB used / 204.71 GB total (10.1%). Peak 21.72 GB (10.6%). ✅ Not a contributing factor.
+Disk: Flat 47.1% throughout. Zero I/O wait. ✅ Not a contributing factor.
+Disk Write IOPS: Sustained 10–151 req/s — consistent with active compilation output writing object files. Normal for a large build.
+Disk Read IOPS: Anomalous spike at 08:05Z — 408.8 req/s peak (vs. normal ~0.01 req/s). Possible large header scan, toolchain cache miss, or dependency resolution. Not indicative of a storage failure.
+Network Receive: Elevated and volatile from 07:30Z onward — spikes to 17.9 MB/s at 08:22Z. Consistent with dependency downloads, artifact fetching, or distributed build coordination.
+Network Send: Single spike at 07:47Z — 97.2 MB peak. Possible artifact upload or large data transfer.
+File Handles: Steady increase from 6,855,223 to 7,042,892 (+187,669 / +2.7%) over 3 hours. Consistent with a large parallel build accumulating open file handles. Not at a system limit level.
+Logs: ⚠️ No logs available from qctcrmbld52 in Datadog. Windows Event Log collection is not configured on this host.
+Commander Host
+No evidence of Commander-side failure. Commander is not implicated in this failure.
+Datadog — GitHub Actions (Correlated Codebase Evidence — OUT_OF_SCOPE for Execution Path)
+ℹ️ Scope Note: The GitHub Actions pipeline (qualcomm-linux/kernel-config, qualcomm-linux/qcom-deb-images) is a separate CI system building the same LEMANS-1 codebase. All GitHub Actions jobs completed with status: success and conclusion: success. This evidence is included only as codebase context — it is not part of the CloudBees execution path and is marked OUT_OF_SCOPE for the execution path inventory.
+
+GitHub Actions pipeline: checker (dtb-check) / checker — ran make -j16 O=temp-out CHECK_DTBS=y for multiple LEMANS DTB targets (lemans-evk.dtb, lemans-evk-sd-card.dtb, lemans-evk-ifp-mezzanine.dtb, lemans-evk-emmc.dtb, lemans-evk-el2.dtb, lemans-evk-camx.dtb, lemans-evk-camera-csi1-imx577.dtb) — all completed successfully.
+16 DTS graph_port warnings in lemans-evk-camera-sensor.dtsi and lemans-camera-sensor.dtsi — pre-existing, persistent across 4 build passes (06:44Z, 06:46Z, 07:27Z, 07:52Z).
+Additional reg_format prerequisite failures in lemans-evk-camx.dtbo and lemans-rtss-mb.dtbo at 07:52Z.
+Last commit: SHA ee11e490952f61d72e5f85d5cb82209c532a88e9 — "ci: Enable Storage topic branches for pre-merge rootfs generation" (2026-07-03). This commit modified CI branch filtering, not kernel source — unlikely to be the direct cause.
+Runner: kernel-prd-u2404-x64-od-eph-i-0ac4dbaad853314b6 (Ubuntu 24.04, x64) — different OS and architecture from qctcrmbld52 (Windows Server 2022). Build environment differences may explain why GitHub Actions succeeded while CloudBees failed.
+Splunk
+Splunk was not queried — Datadog provided sufficient evidence for this investigation.
+External Dependency
+No external dependency failures were identified during the Make step window. The QCDFS Kerberos outage (06:00–07:30Z) overlaps with the early portion of the Make step but is not implicated — the Make step ran for 2h 53m before failing, and the QCDFS outage ended at 07:30Z, well before the step failed at 09:23Z.
+7. Probable Root Cause
+Code-Level Compile Failure in LEMANS-1 Kernel/Firmware Build — Probable DTS Structural Error Promoted to Fatal Error
+
+The Make step on agent qctcrmbld52 failed with exit code 4 after 2 hours 53 minutes of compilation. GNU Make exit code 4 definitively indicates a child process (compiler, linker, assembler, or DTC) returned a non-zero exit code. The agent host was healthy throughout — no resource exhaustion, no infrastructure failure.
+
+The most probable cause is that the CloudBees Make step invokes the Device Tree Compiler (DTC) with stricter flags than the GitHub Actions pipeline (e.g., -Werror or W=1), causing the known DTS graph_port unit address warnings in lemans-evk-camera-sensor.dtsi and lemans-camera-sensor.dtsi to be promoted to fatal errors, terminating the build.
+
+Alternatively, the CloudBees build may be building a different configuration or target variant (AU.LEMANS-1 vs. the standard LEMANS-1 targets in GitHub Actions) that exercises a code path with a hard compile error not present in the GitHub Actions targets.
+
+Supporting evidence:
+
+✅ Make exit code 4 = child process failure — definitively a code/toolchain failure, not infrastructure
+✅ Agent host metrics confirm no resource exhaustion (CPU 5%, memory 10%, disk 47%, zero I/O wait)
+✅ Step ran for 2h 53m — consistent with a large build that progresses far before hitting a failing compilation unit
+✅ Known DTS structural errors in LEMANS-1 codebase confirmed by parallel GitHub Actions pipeline
+✅ DTS errors are pre-existing and persistent (confirmed across 4 build passes in GitHub Actions)
+✅ GitHub Actions succeeded on Ubuntu 24.04 x64 — CloudBees failed on Windows Server 2022 — build environment difference may explain divergent outcomes
+⚠️ CloudBees step execution logs from qctcrmbld52 not available — exact failing compilation unit cannot be confirmed without direct log access
+8. Confidence Level
+MEDIUM
+
+Reason:
+
+Make exit code 4 is definitively a code/toolchain failure — this is HIGH confidence
+Agent host health is confirmed by metrics — infrastructure is ruled out with HIGH confidence
+The specific failing compilation unit is unknown — no logs from qctcrmbld52 are available in Datadog
+The DTS errors are confirmed in the codebase but their role in the CloudBees failure is inferred, not directly proven
+The GitHub Actions pipeline (different OS, different runner) succeeded — the exact failure trigger in the CloudBees Windows environment is not confirmed
+Confidence is capped at MEDIUM until CloudBees step execution logs from qctcrmbld52 are examined
+9. Infrastructure vs Code Assessment
+Infrastructure Issue: NO
+Code Issue: YES
+Mixed: NO
+Reason: Make exit code 4 definitively indicates a child process (compiler/linker/DTC) failure — this is a code-level failure. Agent host metrics confirm the host was healthy throughout the entire 2h 53m step execution. No infrastructure anomalies (CPU, memory, disk, network) correlate with the failure. The "Compile" failure reason in the build metadata is correctly classified for this job. The DTS structural errors in the LEMANS-1 codebase are the most probable contributing code defect.
+
+10. Recommended Remediation
+Immediate: Examine CloudBees step execution logs on qctcrmbld52
+Access the Make step output logs directly from the CloudBees job (job ID: f179cc58-200a-f193-933e-1ea035bf3243, step ID: f179cc58-2c18-f12c-85b0-1ea035bf3243). Search for the first occurrence of Error, error:, fatal error:, or *** [ in the Make output to identify the exact failing compilation unit.
+Fix DTS graph_port unit address errors
+In both lemans-evk-camera-sensor.dtsi and lemans-camera-sensor.dtsi, rename port@2 → port@0 and port@3 → port@1 for all four GMSL deserializer nodes (cam-gmsl-deserializer0 through deserializer3) under cci0@ac13000 through cci3@ac16000. Affected lines: 56, 63, 349, 357, 608, 616, 835, 843 (evk file) and 56, 64, 178, 186, 300, 308, 422, 430 (camera-sensor file).
+Fix DTS reg_format prerequisite failures
+Investigate and fix the reg_format prerequisite failures in lemans-evk-camx.dtbo and lemans-rtss-mb.dtbo that cause spi_bus_reg, i2c_bus_reg, pci_device_bus_num, and pci_device_reg checks to fail.
+Align DTC flags between CloudBees and GitHub Actions
+Compare the DTC invocation flags used in the CloudBees Make step vs. the GitHub Actions make -j16 O=temp-out CHECK_DTBS=y command. If CloudBees uses -Werror or stricter warning flags, either fix the DTS errors or align the flag sets.
+Configure Windows Event Log collection on qctcrmbld52
+The Datadog agent is installed but not collecting logs. Configure the Datadog agent on qctcrmbld52 to collect Windows Event Logs and application logs (including CloudBees agent logs) to enable future log-based RCA.
+11. Preventive Actions
+DTS lint gate in pre-merge CI
+Add a mandatory pre-merge CI check that runs make dtbs_check with the same DTC flags used in the CloudBees production build. Block merges that introduce DTS warnings or errors. This would have caught the graph_port and reg_format issues before they reached the production build.
+Cross-platform build validation
+The GitHub Actions pipeline (Ubuntu 24.04 x64) succeeded while the CloudBees build (Windows Server 2022) failed. Ensure the pre-merge CI pipeline uses the same OS and toolchain as the production CloudBees build environment to catch platform-specific failures early.
+Enable Datadog log collection on all Windows build agents
+Configure the Datadog agent on all qctcrmbld* Windows hosts to collect application logs, CloudBees agent logs, and Windows Event Logs. This is critical for future RCA investigations.
+Make step timeout and early failure detection
+A 2h 53m build that fails at the very end represents significant wasted compute. Implement incremental build caching and parallel compilation monitoring to detect failing compilation units earlier in the build process.
+Build environment parity documentation
+Document the differences between the CloudBees Windows build environment and the GitHub Actions Linux environment for the LEMANS-1 target. Maintain a compatibility matrix to prevent environment-specific failures from reaching production builds.
+12. Sources Used
+Source Type	Query Window	Evidence	Confidence
+CloudBees Metadata	Job payload	Job ID, step name Make, exit code 4, agent host qctcrmbld52, timestamps, failure reason "Compile", step duration 2h 53m 49s	HIGH
+Datadog Infrastructure	Current	qctcrmbld52 registered as Windows Server 2022 Standard, Datadog Agent v7.52.1, source: agent	HIGH
+Datadog Metrics — CPU	06:29Z – 09:23Z	CPU avg 5.3%, peak 14% at 08:13Z. Zero I/O wait. Host not CPU-saturated.	HIGH
+Datadog Metrics — Memory	06:29Z – 09:23Z	Memory avg 20.69 GB / 204.71 GB (10.1%). Peak 21.72 GB (10.6%). No memory pressure.	HIGH
+Datadog Metrics — Disk	06:29Z – 09:23Z	Disk flat 47.1%. Write IOPS 10–151 req/s (normal for compilation). Read spike 408.8 req/s at 08:05Z (anomalous but not failure-causing).	HIGH
+Datadog Metrics — Network	06:29Z – 09:23Z	Receive spikes to 17.9 MB/s (07:30–08:39Z). Send spike 97.2 MB at 07:47Z. Consistent with dependency fetching / artifact transfer.	MEDIUM
+Datadog Logs — qctcrmbld52	06:29Z – 09:23Z	0 logs found — Windows Event Log collection not configured on this host	N/A
+Datadog Logs — GitHub Actions (OUT_OF_SCOPE for execution path)	06:23Z – 09:28Z	16 DTS graph_port warnings in lemans-evk-camera-sensor.dtsi and lemans-camera-sensor.dtsi. reg_format prerequisite failures in lemans-evk-camx.dtbo and lemans-rtss-mb.dtbo. All GitHub Actions jobs: status success.	MEDIUM (codebase context only)
+Datadog Incidents	06:00Z – 09:30Z	No incidents declared for qctcrmbld52, LEMANS, or CI_SAIL	N/A
+Change Stories (CI_SAIL)	2026-07-06T22:00Z – 2026-07-07T09:30Z	No change stories found for CI_SAIL service	N/A

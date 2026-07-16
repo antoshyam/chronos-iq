@@ -1,0 +1,146 @@
+Root Cause Analysis Report — Job f179cbe4-7c01-f1e6-9924-4efb9ff91010
+Job ID: f179cbe4-7c01-f1e6-9924-4efb9ff91010
+Generated: 2026-07-07 | Analyst: NOVA (AI Observability Agent)
+
+---
+1. 📋 Executive Summary
+The CloudBees job CQ2390.LA.1.0-00317-PERF.INT-2_20260706_231957_232004 failed during the Make step on agent host crm-ubuntu326 with exit code 4 — a GNU Make error indicating one or more compiler sub-processes failed. CloudBees explicitly classifies the failure as "Compile".
+
+⚠️ This is the second concurrent failure of the same type within the same 5-minute window. Job f179cbf2-b44b-f18f-b2e3-1ea035bf3243 (agent: crm-ubuntu302) failed identically at 06:21–06:23 UTC. This job (agent: crm-ubuntu326) failed at 06:21–06:24 UTC. Both share the same project (CRMBuilds), procedure (Build.Rel.602829), step (Make), exit code (4), and failure reason (Compile). This strongly suggests a shared root cause — either a common source code defect in the CQ2390.LA.1.0-00317 codebase, or a shared infrastructure condition affecting the CRM build agent pool.
+
+Agent host crm-ubuntu326 has zero telemetry coverage in Datadog — identical to crm-ubuntu302. No metrics, logs, APM spans, or host inventory entry exist. The broader CRM build infrastructure pool shows widespread /local/mnt disk saturation — 12+ hosts at 100% utilization — which is a strong candidate for a pool-wide infrastructure contributing factor.
+
+---
+2. 🗂️ Job Context
+Field	Value
+Job ID	f179cbe4-7c01-f1e6-9924-4efb9ff91010
+Job Name	CQ2390.LA.1.0-00317-PERF.INT-2_20260706_231957_232004
+Project	CRMBuilds
+Procedure	Build.Rel.602829
+Status	completed_error
+Outcome	error
+Build Name	CQ2390.LA.1.0-00317-PERF.INT-2
+Build Status	Failed
+Failure Reason (CloudBees)	Compile
+Failed Step	Make (Step ID: f179cbe4-86af-f171-8434-4efb9ff91010)
+Exit Code	4
+Agent Host	crm-ubuntu326
+---
+3. ⏱️ Build Timeline
+Timestamp (UTC)	Event
+2026-07-07 06:20:04	Job started (CRMBuilds / Build.Rel.602829)
+2026-07-07 06:21:00	Make step started on crm-ubuntu326
+2026-07-07 06:21:00 – 06:24:01	⚠️ CORRELATION WINDOW — Make step executing (3m 1s)
+2026-07-07 06:24:01	Make step FAILED — exit code 4
+2026-07-07 06:25:25	Job ended with status: completed_error
+🔁 Concurrent Failure Pattern: Job f179cbf2 (crm-ubuntu302) ran Make from 06:21:19–06:23:16. This job (crm-ubuntu326) ran Make from 06:21:00–06:24:01. Both were executing simultaneously on different agents from the same build pool, both failed with identical signatures.
+
+---
+4. 🗺️ Execution Path Inventory
+Failed Step: Make — GNU Make build invocation
+Agent Host: crm-ubuntu326 (Ubuntu Linux, CRM build agent pool)
+Commander Host: Not directly identified — no Commander-level evidence found
+Invoked Services: Source code (SCM), compiler toolchain, build dependencies — specific URLs/repos not available from metadata
+Build Infrastructure Pool: mdb_service:qso.crm-linux-build-infrastructure
+Concurrent Sibling Job: f179cbf2-b44b-f18f-b2e3-1ea035bf3243 on crm-ubuntu302 (same pool, same failure)
+---
+5. 🚨 Detected Error Codes
+Code	Source	Meaning	Evidence
+Exit Code 4	GNU Make	Child compiler/linker process returned non-zero. Make propagates the highest child exit code. Exit code 4 indicates a compiler sub-process failure.	CloudBees step metadata: stepId f179cbe4-86af-f171-8434-4efb9ff91010
+failedReason: "Compile"	CloudBees executionContext	CloudBees explicitly classified the failure as a compile failure	executionContext.failedReason field in job metadata
+---
+6. 🔍 Correlated Observations
+CloudBees
+Job f179cbe4-7c01-f1e6-9924-4efb9ff91010 completed with status: completed_error, outcome: error
+Step Make ran for 3 minutes 1 second (06:21:00 → 06:24:01) before failing with exit code 4 — notably 64 seconds longer than the sibling job on crm-ubuntu302 (1m 57s), suggesting a different compile target or more parallelism before hitting the error
+CloudBees execution context explicitly sets failedReason: "Compile"
+Build name CQ2390.LA.1.0-00317-PERF.INT-2 is a performance integration build variant of the same CQ2390.LA.1.0-00317 codebase that also failed in the sibling job (PERF.APQ.GPS.hy11-2)
+Pattern: Two different build variants of the same codebase snapshot (CQ2390.LA.1.0-00317) failed simultaneously on two different agents with identical exit codes and failure reasons.
+Agent Host (crm-ubuntu326)
+⚠️ Agent host crm-ubuntu326 has NO telemetry coverage in Datadog.
+No metrics (CPU, memory, disk, network), no logs, no APM spans, and no host inventory entry were found. The host does not appear in the Datadog host inventory even when querying all crm-ubuntu3xx pattern hosts. Root cause cannot be determined from monitoring data for this specific host. CloudBees step execution logs must be examined directly.
+
+Commander Host
+No Commander-specific evidence found. The ZooKeeper daemon-down alert (Monitor ID: 115792998) remains active but cannot be directly linked to the Make step failure on this agent.
+Finding: No relevant findings.
+Datadog — CRM Build Infrastructure Pool
+Active Alerting Monitors:
+
+Monitor	Status	Scope	Relevance
+SWENG|ECOMMANDER|BI|PROD - High /local/mnt partition utilization (ID: 139516185)	🔴 ALERT	mdb_service:qso.crm-linux-build-infrastructure, device:/local/mnt, threshold >90%	HIGH — Same pool as crm-ubuntu326
+SWENG|ECOMMANDER|CLOUDBEE|PROD - ZooKeeper process daemon down (ID: 115792998)	🔴 ALERT	CloudBees Commander cluster	LOW — No direct link to Make step failure
+Disk Utilization — Pool-Wide Analysis (06:18–06:25 UTC):
+
+Host	/local/mnt Utilization	Status
+las-colo12-h17-31, las-colo12-h19-14, las-colo12-h18-12, las-colo41-c23-16, las-colo12-j12-11, san-w175-ma3-2-05, las-colo12-h19-20, san-w170-s5-2-05, san-w170-s5-4-08, crm-ubuntu237, las-colo12-h17-28, san-w170-s5-2-01, las-colo4-c15-01-a6	100% (1.0)	🔴 FULL — Disk Saturated
+crm-ubuntuhyd42	59%	✅ Normal
+crm-ubuntu158	54.3%	✅ Normal
+crm-ubuntu233	55.1%	✅ Normal
+san-w175-ja4-5-08, san-w175-ja4-6-06	52.6–53.7%	✅ Normal
+las-colo41-c23-19, las-colo41-c23-3	42.9%	✅ Normal
+las-colo41-d28-24	67.9%	✅ Normal
+crm-ubuntu326	NOT IN DATADOG	⚫ No Telemetry
+Critical Finding: 13 out of 22 sampled hosts in the CRM build infrastructure pool have /local/mnt at 100% utilization — a sustained, pool-wide disk saturation condition. This is not a transient spike; the metric is flat at 1.0 across the entire 8-minute observation window. The active monitor (ID: 139516185) confirms this is a known alerting condition. crm-ubuntu326 is not instrumented, but given the pool-wide saturation pattern, it is highly probable that crm-ubuntu326 is also affected.
+
+Splunk
+No Splunk index identified for CloudBees/CRM build logs in the available toolset.
+Finding: No relevant findings from Splunk.
+External Dependencies
+No SCM, artifact repository, or package manager failures were identified during the correlation window.
+Finding: No confirmed external dependency failures.
+---
+7. 🎯 Probable Root Cause
+Primary: Compile failure during the GNU Make step on agent crm-ubuntu326, consistent with either a source code defect in the CQ2390.LA.1.0-00317 codebase or disk exhaustion on /local/mnt causing compiler write failures.
+
+Supporting Evidence:
+
+CloudBees executionContext.failedReason = "Compile" — first-party classification
+GNU Make exit code 4 — child compiler process returned non-zero
+Two concurrent jobs from the same codebase snapshot (CQ2390.LA.1.0-00317) failed simultaneously on two different agents (crm-ubuntu302 and crm-ubuntu326) with identical exit codes and failure reasons — this dual-failure pattern strongly suggests either a shared code defect or a shared infrastructure condition
+Pool-wide /local/mnt disk saturation: 13/22 sampled hosts at 100% utilization, sustained throughout the entire correlation window — active alert on Monitor ID 139516185
+crm-ubuntu326 is not in Datadog inventory — same telemetry gap as crm-ubuntu302, suggesting a systematic gap in the crm-ubuntu3xx host range
+Dual-Failure Pattern Analysis:
+If code defect: Both build variants (PERF.APQ.GPS and PERF.INT) would fail on any agent because the source is broken. This is the most parsimonious explanation for simultaneous failures on different agents.
+If disk exhaustion: Both agents would need to be affected. Given 13/22 pool hosts are at 100% /local/mnt, this is plausible but requires crm-ubuntu302 and crm-ubuntu326 to both be in the saturated subset.
+Most likely: Code defect in CQ2390.LA.1.0-00317, potentially compounded by disk pressure on the build workspace.
+---
+8. 📊 Confidence Level
+⚠️ MEDIUM
+
+Reason: The dual-failure pattern across two agents with identical signatures elevates confidence that the root cause is shared — either a code defect or pool-wide infrastructure issue. However, the specific cause (code error vs. disk exhaustion) cannot be confirmed because neither crm-ubuntu326 nor crm-ubuntu302 has Datadog telemetry coverage. The pool-wide disk saturation is a strong circumstantial indicator but is not direct evidence on the failing hosts. Step execution logs are required to confirm.
+
+---
+9. 🏗️ Infrastructure vs. Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue	POSSIBLE	13/22 pool hosts at 100% /local/mnt disk utilization. crm-ubuntu326 has no telemetry to confirm or deny. Pool-wide disk saturation is a known active alert condition.
+Code Issue	POSSIBLE — ELEVATED	Two different build variants of the same codebase snapshot failed simultaneously on different agents. This pattern is more consistent with a code defect than a coincidental infrastructure failure on two separate hosts.
+Mixed	POSSIBLE	Code defect may be compounded by disk pressure on the build workspace.
+---
+10. 🔧 Recommended Remediation
+Retrieve CloudBees step execution logs immediately — Access the Make step output from the CloudBees Commander UI for job f179cbe4-7c01-f1e6-9924-4efb9ff91010. Look for compiler error messages (error:, undefined reference, No space left on device, Killed). Cross-reference with the sibling job f179cbf2 logs to identify if the same error message appears in both.
+Compare error messages across both failing jobs — If both jobs show the same compiler error (e.g., same file, same symbol), the root cause is a code defect. If both show No space left on device, the root cause is disk exhaustion.
+Check disk usage on crm-ubuntu326 — SSH to the agent and run df -h /local/mnt. Given 13/22 pool hosts are at 100%, this host is likely also saturated.
+Resolve /local/mnt disk saturation across the pool — Clean up build artifacts, object files, and intermediate outputs on all affected hosts. The active monitor (ID: 139516185) is alerting on the entire qso.crm-linux-build-infrastructure pool.
+Investigate the CQ2390.LA.1.0-00317 codebase — Check recent commits to the CQ2390.LA.1.0-00317 branch for changes that could introduce compile errors. The simultaneous failure of two build variants is a strong indicator of a code-level issue.
+Resolve ZooKeeper alert — Restore the ZooKeeper daemon on the CloudBees Commander cluster (Monitor ID: 115792998) to prevent job scheduling instability.
+---
+11. 🛡️ Preventive Actions
+Install Datadog Agent on all crm-ubuntu3xx hosts — Both crm-ubuntu302 and crm-ubuntu326 are completely dark. The entire crm-ubuntu3xx range appears to be uninstrumented. This is a systematic observability gap that must be closed.
+Implement automated build workspace cleanup — Add pre-build or post-build steps to purge stale object files and intermediate artifacts from /local/mnt. The current pool-wide saturation (13/22 hosts at 100%) indicates no automated cleanup is in place.
+Implement pre-dispatch agent health checks — Before CloudBees dispatches a job to an agent, verify disk space on /local/mnt exceeds a minimum threshold (e.g., 20% free). Reject agents that fail the check.
+Add disk utilization alerting for crm-ubuntu3xx hosts — Once the Datadog Agent is deployed, extend the existing Monitor ID 139516185 to cover the crm-ubuntu3xx range.
+Implement build-level pre-flight checks — Add a pre-Make step that validates disk space, available memory, and compiler toolchain availability before invoking the full build.
+Enforce build artifact retention policies — Set maximum retention periods for build outputs on /local/mnt to prevent recurrence of pool-wide disk exhaustion.
+Stabilize ZooKeeper — Investigate and resolve the root cause of the ZooKeeper daemon outage to prevent CloudBees Commander HA instability.
+---
+12. 📚 Sources Used
+Source Type	Query Window	Evidence	Relevance
+CloudBees Job Metadata	N/A (provided)	Job ID, step name, exit code 4, agent host, failedReason=Compile	HIGH — Primary evidence
+Datadog Logs (Flex)	06:20:00–06:26:00 UTC	0 results for crm-ubuntu326, job ID, build name	No relevant findings — agent not instrumented
+Datadog Host Inventory	Current	crm-ubuntu326 not found; entire crm-ubuntu3xx range absent	Confirms systematic telemetry gap in crm-ubuntu3xx range
+Datadog Metrics — Pool Disk	06:18:00–06:26:00 UTC	13/22 sampled pool hosts at 100% /local/mnt utilization, sustained flat throughout window	MEDIUM-HIGH — Pool-wide disk saturation is a strong contributing factor candidate
+Datadog Monitors	Current state	Active /local/mnt alert (ID: 139516185) on qso.crm-linux-build-infrastructure; ZooKeeper down (ID: 115792998)	MEDIUM — Confirms known infrastructure alert condition
+Datadog Events	06:20:00–06:26:00 UTC	0 events for crm-ubuntu326 or job	No relevant findings
+Datadog Incidents	05:00–07:00 UTC	0 active incidents	No relevant findings
+Datadog APM Spans	06:20:00–06:26:00 UTC	0 spans from crm-ubuntu326	No relevant findings
+Cross-Job Correlation	06:20:00–06:25:00 UTC	Sibling job f179cbf2 (crm-ubuntu302) failed identically at same time — same project, procedure, step, exit code, failedReason	HIGH — Dual-failure pattern elevates confidence in shared root cause

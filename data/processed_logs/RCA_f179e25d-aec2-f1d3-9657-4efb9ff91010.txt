@@ -1,0 +1,153 @@
+Build ID: f179e25d-aec2-f1d3-9657-4efb9ff91010
+---
+1. Executive Summary
+The CloudBees CI build CI_BOOT.XF.4.3-00263.1-ATHERTONLAZ-70 failed on 2026-07-07 due to a Compile Failure in the Make step. The Make step executed on agent host san-w175-ha1-4-07 and exited with an error, triggering an abortJob error-handling policy. This cascaded into a SaveBuild step failure and the cancellation of all downstream packaging and post-processing steps. The agent host showed no resource exhaustion (CPU, memory, disk all healthy). The root cause is a source code or build script compile error within the buildex.py-driven UEFI firmware build for the AthertonPkg target (variants LAA/LAB, Ubuntu 16.04).
+
+---
+2. Job Context
+Job ID: f179e25d-aec2-f1d3-9657-4efb9ff91010
+Job Name: CI_BOOT.XF.4.3-00263.1-ATHERTONLAZ-70_20260707_020049_020056
+Build ID: CI_BOOT.XF.4.3-00263.1-ATHERTONLAZ-70
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: error | abortStatus: ABORT
+Failed Step: Make (primary), SaveBuild (cascading)
+Launched By: tiberiumUserEC10_11 | Requester: pawkuma
+Software Image: BOOT.XF.4.3 | Branch Revision: 00263 | Spin: 70
+Target: AthertonPkg — Variants LAA, LAB | OS: Ubuntu 16.04
+Build Location: \\snowcone\builds677\PROD
+Build Delete Date: 2026-07-10
+failedReason (BuildInfoJson): Compile
+---
+3. Build Timeline
+Time (UTC)	Event	Host	Outcome
+2026-07-07 09:00:56Z	Job Created / Started	las-colo12-j13-11	Running
+2026-07-07 09:00:57Z	Step: Setup — Started	san-w175-ha1-4-07	Running
+2026-07-07 09:01:19Z	Step: Setup — Completed	san-w175-ha1-4-07	✅ Success (22s)
+2026-07-07 09:02:58Z	Step: Make — Submitted	san-w175-ha1-4-07	Running
+2026-07-07 09:05:29Z	Step: Make — FAILED → abortJob triggered	san-w175-ha1-4-07	❌ Error (~2m31s)
+2026-07-07 09:05:30Z	Step: SaveBuild — Submitted	—	Running
+2026-07-07 09:06:13Z	Step: SaveBuild — FAILED	—	❌ Error (~43s)
+2026-07-07 09:06:13Z+	Cascading Cancellations: PreSave, PostSave, ConcurrentCopyPack, PackIt, NonParallelPack, HybridPackIt, HoldLinuxResource, NonParallelPackMake, ConcurrentCopyPackMake, PackMake, CheckAbortCondition	—	🚫 Canceled
+2026-07-07 09:08:30Z	Step: PostTimingsToSplunk (alwaysRun) — Started	las-colo12-j13-11	Running
+2026-07-07 09:08:39Z	BuildInfoJson written: status=Failed, failedReason=Compile	las-colo12-j13-10	✅ Success
+2026-07-07 09:08:46Z	Step: PostTimingsToSplunk — Completed	las-colo12-j13-11	✅ Success
+2026-07-07 09:08:49Z	Job Completed	las-colo12-j13-11	❌ completed_error / ABORT
+2026-07-07 09:08:56Z	Job record last modified	—	Final state persisted
+Total Elapsed Time: ~472 seconds (~7 min 52 sec)
+
+---
+4. Execution Path Inventory
+Primary Failed Step: Make
+Cascading Failed Step: SaveBuild
+Agent Host (Build Server): san-w175-ha1-4-07 (SanDiego site, Ubuntu 16.04)
+Build Server Drive: G:
+Commander Nodes: las-colo12-j13-09, las-colo12-j13-10, las-colo12-j13-11
+Resource Pool: CRMBuildsLinux-Ubuntu16-04
+Workspace: crm_ws_sd
+Build Script: boot_images/QcomPkg/buildex.py (Python 3.8.2)
+Build Targets: AthertonPkg, QcomToolsPkg, QcomTestPkg, QcomSocPlatTestPkg, QcomCatePkg
+Artifact Store: \\snowcone\builds677\PROD (Filer)
+DB Host: oil.qualcomm.com (aswproductiondatabase)
+External Services Referenced in Setup: pcm.qualcomm.com, csds.qualcomm.com, verifysrc.qualcomm.com, apigw-op.qualcomm.com, license-pdlm-1-encnaa.qualcomm.com (ARM license)
+---
+5. Detected Error Codes & Messages
+Source	Error / Code	Evidence
+CloudBees Job	abortStatus: ABORT	errorMessage: "step 'Make' failed and its error handling aborted the job"
+CloudBees Job	outcome: error	combinedStatus: completed_error
+BuildInfoJson	failedReason: Compile	status: "Failed", serviceType: "Continuous Integration"
+CloudBees Job	SaveBuild also failed	errorMessage: "step 'SaveBuild' failed and its error handling aborted the job"
+CloudBees Step	Setup exitCode: 0	Setup completed successfully — no pre-build environment issue
+Note: Specific compiler error messages (e.g., GCC/LLVM error lines) are in the Make step log file: Make.<stepId>.log on the agent. These were not directly accessible via Splunk telemetry.
+
+---
+6. Correlated Observations
+☁️ CloudBees
+Job metadata explicitly records failedReason: Compile in BuildInfoJson — this is set programmatically by the build framework after analyzing Make step output.
+Make step ran for ~2 min 31 sec before failing — consistent with a partial compile that encountered an error mid-build.
+SaveBuild failure is a direct cascade from Make failure — SaveBuild cannot succeed without valid build artifacts.
+All 11 downstream steps (PackIt, ConcurrentCopyPack, etc.) were canceled, not failed — confirming they never executed.
+Post-run alwaysRun steps (Check If Any Step Failed due to TimeOut, Calculate metrics, GetBuildInfo, PostTimingsToSplunk) all completed successfully — confirming the Commander infrastructure was healthy.
+Setup step succeeded (exitCode: 0, 22s) — environment setup, DB connectivity, license server, and external service URLs were all reachable.
+🖥️ Agent Host: san-w175-ha1-4-07
+CPU: Overall utilization was very low (~1.16% user, 98.6% idle) at the time of monitoring. No CPU saturation. ✅
+Memory: Total 385,619 MB; only ~1.3–1.7% used (4,918–6,623 MB). No memory pressure. ✅
+Swap: 0.1–0.2% — negligible. ✅
+Disk (/local/mnt): 1.7T total, 48 GB used (3%) — ample space for build workspace. ✅
+/usr/vice/cache: 72% used (1.1G/1.5G) — elevated but not full. ⚠️ Monitor this.
+Load Average: Spikes observed at 04:53 PDT (8.09) and 04:13 PDT (5.36) — these occurred ~4 hours before the build and are OUT_OF_SCOPE.
+Page-out spikes: At 05:33 and 06:13 PDT — also prior to the build window. OUT_OF_SCOPE.
+SCOM Alerts: No active SCOM alerts on san-w175-ha1-4-07. ✅
+Other jobs on same agent: No concurrent jobs found on san-w175-ha1-4-07 during the build window in available telemetry.
+🏗️ Commander Nodes
+las-colo12-j13-09, las-colo12-j13-10, las-colo12-j13-11: All three nodes participated in job orchestration. All post-run steps completed with exit code 0. No SCOM alerts on any Commander node. Commander infrastructure was healthy. ✅
+Memory on las-colo12-j13-09: 515,546 MB total, 18.2% used (~94 GB) — healthy. ✅
+Disk on las-colo12-j13-09: / at 30%, /var at 35%, /local/mnt at 2% (219G/14T), /usr/vice/cache at 77% — no critical disk pressure. ✅
+📊 Datadog
+No Datadog queries were executed as no direct evidence linked Datadog alerts to this job ID, agent host, or Commander hosts. OUT_OF_SCOPE per RCA scope rules.
+
+📋 Splunk
+ecommander index confirmed job metadata, step sequence, BuildInfoJson, and error messages.
+os/osetx index confirmed agent host (san-w175-ha1-4-07) and Commander node (las-colo12-j13-09) resource health.
+No OS-level errors, OOM events, or disk-full conditions found during the build window.
+🔗 External Dependencies
+Setup step succeeded — confirming the following were reachable at job start:
+oil.qualcomm.com (CRM DB)
+pcm.qualcomm.com (PCM WebService)
+csds.qualcomm.com (Software Revision Service)
+verifysrc.qualcomm.com
+apigw-op.qualcomm.com (Axway API Gateway)
+license-pdlm-1-encnaa.qualcomm.com (ARM License Server)
+No evidence of external service failure during the Make step window.
+---
+7. Probable Root Cause
+PRIMARY ROOT CAUSE: Compile Failure in the Make Step
+
+The build framework's buildex.py script invoked the UEFI firmware compilation for AthertonPkg (variants LAA/LAB) on agent san-w175-ha1-4-07. The Make step failed after ~2 min 31 sec of execution. The BuildInfoJson property was explicitly set to failedReason: Compile by the build framework, indicating the failure was detected within the compilation phase — not in packaging, artifact storage, or infrastructure.
+
+The agent host had no resource constraints (CPU, memory, disk all healthy). The Commander nodes were healthy. External services were reachable (Setup succeeded). The failure is therefore attributable to a source code or build script error within the BOOT.XF.4.3 branch at revision 00263, spin 70.
+
+Supporting Evidence:
+
+BuildInfoJson: "failedReason":"Compile", "status":"Failed"
+CloudBees errorMessage: "step 'Make' failed and its error handling aborted the job"
+Make step duration: ~2m31s (partial compile, not a timeout — timeout was set to 5 hours)
+Setup step: exitCode 0 — environment was valid
+Agent host: No CPU/memory/disk exhaustion
+No SCOM alerts on agent or Commander nodes
+---
+8. Confidence Level
+MEDIUM–HIGH
+Reason: The CloudBees job metadata and BuildInfoJson explicitly classify the failure as Compile. Infrastructure telemetry confirms no resource exhaustion on the agent. However, the specific compiler error lines (GCC/LLVM output) from the Make step log file (Make.<stepId>.log) were not directly accessible via Splunk, preventing identification of the exact failing source file, function, or error code. Confidence would be HIGH with direct Make step log access.
+
+---
+9. Infrastructure vs. Code Assessment
+Infrastructure Issue	NO
+Code / Compile Issue	YES
+Mixed Issue	NO
+Reason: Agent host resources (CPU, memory, disk) were all within healthy ranges. No SCOM alerts. Commander nodes were healthy. The failure is explicitly classified as Compile by the build framework. The Make step ran for ~2.5 minutes before failing — consistent with a source code compilation error encountered mid-build, not an infrastructure timeout or resource exhaustion event.
+
+---
+10. Recommended Remediation
+Examine the Make step log directly: Retrieve Make.f179e25d-*.log from the CloudBees job workspace on san-w175-ha1-4-07 or from the build artifact location at /prj/qct/asw/crmbuilds/snowcone/builds677/PROD/CI_BOOT.XF.4.3-00263.1-ATHERTONLAZ-70. Look for GCC/LLVM/Python error lines.
+Identify the failing source file: Search the Make log for patterns like error:, fatal error:, undefined reference, No such file or directory, or Python tracebacks from buildex.py.
+Check recent code changes at revision 00263: Review commits to the BOOT.XF.4.3 branch at or near revision 00263 that affect AthertonPkg (LAA/LAB variants). Identify any changes to header files, build scripts, or toolchain configurations.
+Verify toolchain availability: Confirm Python 3.8.2 (/pkg/qct/software/ubuntu/python/3.8.2/bin) and all required build tools are present and functional on san-w175-ha1-4-07.
+Re-run the build after identifying and fixing the compile error. If the error is in a dependency (QcomToolsPkg, QcomTestPkg), fix the dependency first.
+Monitor /usr/vice/cache on san-w175-ha1-4-07 (currently at 72%) — clean up if approaching capacity.
+---
+11. Preventive Actions
+Implement pre-commit compile checks or incremental build validation for BOOT.XF.4.3 branch changes targeting AthertonPkg.
+Enable Splunk ingestion of CloudBees step-level logs (Make.*.log) to allow direct log-based RCA without requiring manual file retrieval.
+Add a compile error pattern alert in Splunk/Datadog triggered when BuildInfoJson contains failedReason: Compile for CI builds.
+Set up disk usage monitoring alerts for /usr/vice/cache on build agents when utilization exceeds 80%.
+Consider build artifact retention policies to prevent workspace accumulation on /local/mnt.
+---
+12. Sources Used
+Source Type	Query Window	Evidence Found	Relevance
+Splunk — ecommander index	-7d to now	Job metadata, step sequence, BuildInfoJson, error messages, Commander node activity	PRIMARY — direct CloudBees job evidence
+Splunk — os index (san-w175-ha1-4-07)	-7d to now	CPU utilization (very low), vmstat (load avg, page-out), disk usage (/local/mnt 3%, /usr/vice/cache 72%)	Agent host health during build window
+Splunk — os index (las-colo12-j13-09)	-7d to now	Memory 18.2% used, disk healthy, load avg 1–7 (normal)	Commander node health
+SCOM — san-w175-ha1-4-07	Active alerts	No active alerts	Agent host monitoring — confirmed healthy
+SCOM — las-colo12-j13-09/10/11	Active alerts	No active alerts	Commander node monitoring — confirmed healthy
+---

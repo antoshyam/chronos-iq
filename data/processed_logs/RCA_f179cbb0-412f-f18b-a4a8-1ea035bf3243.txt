@@ -1,0 +1,129 @@
+Root Cause Analysis Report
+Job ID: f179cbb0-412f-f18b-a4a8-1ea035bf3243  |  Build: CQ2390.LA.1.0-00317-PERF.INT-1  |  Outcome: ERROR
+
+---
+1. Executive Summary
+CloudBees job f179cbb0-412f-f18b-a4a8-1ea035bf3243 failed during the "Make" step with exit code 4 on agent host crm-ubuntu322. The CloudBees execution context explicitly classifies the failure reason as "Compile". The Make step ran for approximately 2 minutes 25 seconds (06:19:34 → 06:21:59 UTC) before terminating with a non-zero exit code.
+
+Critical Finding: Agent host crm-ubuntu322 has no Datadog telemetry coverage — it is absent from the Datadog host inventory, has no registered Datadog Agent, and produced zero logs, metrics, or events in any monitored data source. Root cause cannot be confirmed from monitoring data alone. The CloudBees step execution logs on the agent must be examined directly.
+
+All other "compile error" and "commander error" log entries found during the correlation window belong to unrelated systems (Gerrit GC operations, GitHub Actions runners) and are explicitly excluded per scope rules.
+
+---
+2. Job Context
+Job ID: f179cbb0-412f-f18b-a4a8-1ea035bf3243
+Job Name: CQ2390.LA.1.0-00317-PERF.INT-1_20260706_231829_231836
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: Make (Step ID: f179cbb0-4c2c-f151-ab07-4efb9ff91010)
+Exit Code: 4
+Agent Host: crm-ubuntu322
+Build Name: CQ2390.LA.1.0-00317-PERF.INT-1
+Declared Failure Reason: Compile
+---
+3. Build Timeline
+Time (UTC)	Event	Detail
+2026-07-07 06:18:36	Job Started	CRMBuilds / Build.Rel.602829 initiated
+2026-07-07 06:19:34	Make Step Started	Step begins on crm-ubuntu322 — Correlation Window Opens
+2026-07-07 06:21:59	Make Step FAILED	Exit Code 4 — Correlation Window Closes (duration: ~2m 25s)
+2026-07-07 06:24:16	Job Ended	Job terminates with outcome: error
+---
+4. Execution Path Inventory
+Failed Step: "Make" — compile/build step invoking make toolchain
+Agent Host: crm-ubuntu322 (Linux Ubuntu — inferred from hostname pattern)
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Invoked Services: Source code repository (SCM) and build toolchain (make) — specific URLs/endpoints not available from metadata
+---
+5. Detected Error Codes
+Code	Source	Meaning	Evidence
+Exit Code 4	CloudBees Step Metadata	GNU Make exit code 4 = build error (compilation failure, missing target, or fatal make error). Distinct from exit code 2 (usage error) or 1 (rule failure).	Provided in job payload — failedStep.exitCode = "4"
+Compile	CloudBees executionContext	Build system explicitly classified failure as a compile-type failure	executionContext.failedReason = "Compile"
+---
+6. Correlated Observations
+CloudBees
+Job metadata confirms: step "Make" failed with exit code 4 on host crm-ubuntu322
+Failure reason explicitly set to "Compile" in execution context
+Step duration: ~2 minutes 25 seconds — consistent with a partial compile run before failure
+Build name: CQ2390.LA.1.0-00317-PERF.INT-1 — PERF.INT build type (performance integration)
+Confidence: HIGH — directly from job payload
+Agent Host (crm-ubuntu322)
+⚠️ Agent host crm-ubuntu322 has NO telemetry coverage in Datadog.
+The host is absent from the Datadog host inventory. No CPU, memory, disk, or network metrics were returned. No logs were found. No Datadog Agent appears to be installed or reporting from this host.
+
+Root cause cannot be determined from monitoring data. CloudBees step execution logs must be examined directly on crm-ubuntu322.
+
+Other CRM Ubuntu agents (crm-ubuntu265, crm-ubuntu238) are registered in Datadog with Agent 7.64.1 — confirming the CRM fleet does use Datadog, but crm-ubuntu322 is not enrolled
+Reference metrics on crm-ubuntu238 showed a CPU spike to ~24.7% at the end of the window — this is on a different host and is OUT_OF_SCOPE
+Reference metrics on crm-ubuntu265 showed stable low CPU (~0.03–0.24%) — OUT_OF_SCOPE
+Commander Host
+No Commander host identified in job metadata
+No Commander-related errors found in logs during the correlation window
+No evidence of Commander contribution to failure — OUT_OF_SCOPE
+Datadog
+Zero log entries matching job ID, build name, procedure name, or agent hostname
+Zero Datadog events for crm-ubuntu322
+Zero active incidents during the job execution window
+Zero monitors configured for crm-ubuntu322
+Finding: No Datadog coverage for the failed agent host
+Splunk
+Not queried in this investigation (Datadog flex tier searched as primary log source)
+Splunk ecommander index may contain CloudBees step logs — recommended as next step
+External Dependencies — SCOPE VALIDATION
+Gerrit GC errors (e.g., fatal: bad object refs/changes/01/220101/1 on qctaisw_tools/hexagon-sdk-6.2.0-win.git) — found at 06:24:06 UTC, after the failed step ended at 06:21:59 UTC. OUT_OF_SCOPE — no direct link to the Make step, and occurred after failure.
+GitHub Actions runner log (ci-foundry, Yocto build) — unrelated CI system, different job ID, different runner. OUT_OF_SCOPE
+Gerrit CD sanity checker error (missing cd.xml) — unrelated Android_Main project. OUT_OF_SCOPE
+---
+7. Probable Root Cause
+Primary: Compile Failure during Make step on crm-ubuntu322
+
+The CloudBees execution context explicitly classifies the failure as "Compile". GNU Make exit code 4 indicates a fatal build error — typically a compiler error, missing source file, missing symbol, or unresolvable dependency that caused make to abort. The step ran for ~2m 25s before failing, consistent with a partial compile run that encountered a fatal error mid-build.
+
+Supporting Evidence:
+
+exitCode = 4 (GNU Make fatal error) — from CloudBees job payload
+failedReason = "Compile" — from CloudBees executionContext
+Step name = "Make" — direct invocation of the make build system
+Build type = PERF.INT (performance integration) — may involve specialized compiler flags or toolchains
+Cannot confirm specific compile error (missing symbol, syntax error, toolchain issue, missing dependency) without direct access to the Make step's stdout/stderr logs on crm-ubuntu322.
+
+---
+8. Confidence Level
+⚠️ MEDIUM
+
+The failure category (Compile) is confirmed with HIGH confidence from CloudBees metadata
+The specific compile error (root file, line, symbol) is UNKNOWN — no step logs available in any monitored system
+Agent host has zero telemetry coverage — infrastructure contribution (disk full, OOM, NFS mount failure) cannot be ruled out or confirmed
+Overall confidence is MEDIUM: category is clear, specific cause requires direct log access
+---
+9. Infrastructure vs Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue	POSSIBLE — UNCONFIRMED	No agent telemetry available. Cannot confirm or exclude disk exhaustion, OOM, or NFS issues on crm-ubuntu322.
+Code Issue	LIKELY — YES	CloudBees explicitly classifies as "Compile" failure. Exit code 4 from GNU Make is consistent with a compiler/build error in source code or build scripts.
+Mixed	POSSIBLE	Cannot be excluded without agent-level evidence.
+---
+10. Recommended Remediation
+Retrieve Make step logs directly from crm-ubuntu322: Access the CloudBees agent workspace on crm-ubuntu322 and retrieve the stdout/stderr output of the "Make" step. Look for compiler error messages (e.g., error:, undefined reference, No rule to make target, fatal error).
+Check CloudBees job log archive: Access the CloudBees Commander UI for job f179cbb0-412f-f18b-a4a8-1ea035bf3243 → Step "Make" → View Log to retrieve the full step output.
+Identify the failing compilation unit: The Make exit code 4 typically appears after a compiler error. Identify the specific source file, module, or target that failed.
+Check for recent code changes: Review recent commits to the source tree used by build CQ2390.LA.1.0-00317-PERF.INT-1 (branch/tag associated with this PERF.INT build) for changes that may have introduced a compile error.
+Verify toolchain availability: Confirm that the compiler, linker, and all required build tools are present and correctly versioned on crm-ubuntu322.
+Check disk space on crm-ubuntu322: Verify that the build workspace has sufficient disk space (Make exit code 4 can also occur if the compiler cannot write output files due to disk exhaustion).
+---
+11. Preventive Actions
+Install Datadog Agent on crm-ubuntu322: This host has zero observability coverage. Install and configure the Datadog Agent to collect CPU, memory, disk, and process metrics. This is critical for future RCA investigations.
+Enable CloudBees log forwarding to Datadog/Splunk: Configure CloudBees agent step logs to be forwarded to a centralized log platform so that compile errors are searchable without direct host access.
+Add disk space monitoring: Implement disk utilization alerts on all CRM build agents to detect disk exhaustion before it causes build failures.
+Standardize agent enrollment: Audit all CRM build agents against the Datadog host inventory. Several CRM Ubuntu agents are enrolled (crm-ubuntu265, crm-ubuntu238) but crm-ubuntu322 is not — ensure consistent coverage across the fleet.
+Pre-build environment validation: Add a pre-step to the CloudBees procedure to validate toolchain availability, disk space, and required dependencies before invoking Make.
+JIRA tracking: A JIRA search for CQ2390 was active during the build window — ensure build failures are automatically linked to JIRA tickets for tracking and trend analysis.
+---
+12. Sources Used
+Source Type	Query Window	Evidence	Relevance
+CloudBees Job Payload	N/A (provided)	Job ID, step name, exit code 4, agent host, failure reason "Compile"	HIGH — Primary evidence source
+Datadog Logs (Flex)	06:18:00–06:25:00 UTC	No relevant findings for job ID, build name, agent host, or procedure	Searched — no coverage for crm-ubuntu322
+Datadog Host Inventory	Current	crm-ubuntu322 NOT present. 20 other CRM hosts found. crm-ubuntu265, crm-ubuntu238 confirmed with Agent 7.64.1	HIGH — Confirms telemetry gap
+Datadog Metrics	06:19:00–06:22:30 UTC	No metrics for crm-ubuntu322. Reference metrics retrieved for crm-ubuntu265 and crm-ubuntu238 (different hosts)	No relevant findings for failed host
+Datadog Events	06:18:00–06:25:00 UTC	No events for crm-ubuntu322	No relevant findings
+Datadog Incidents	06:00:00–06:25:00 UTC	Zero active incidents during job window	No relevant findings
+Datadog Monitors	Current	No monitors configured for crm-ubuntu322	Confirms monitoring gap

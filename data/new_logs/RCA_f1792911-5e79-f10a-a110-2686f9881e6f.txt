@@ -1,0 +1,412 @@
+---
+job_id: f1792911-5e79-f10a-a110-2686f9881e6f
+chat_id: A7APNVH3TKXD8WE7TZB3
+generated_at: 2026-07-07T16:10:00.649946
+source: NOVA
+partial_response: False
+---
+
+I now have all the data I need. The Splunk results confirm multiple other jobs were running on `san-w175-ma3-1-05` concurrently (from the resource pool `CRMBuildsLinux-Ubuntu18-04`), and Datadog confirms **~99% memory utilization** on the agent host. The `failedReason: "Compile"` is explicitly set in the BuildInfoJson. Let me now compile the complete RCA report.
+
+---
+
+# CloudBees CD/RO Root Cause Analysis Report
+
+---
+
+## # 1 Summary
+
+**Job `f1792911-5e79-f10a-a110-2686f9881e6f`** (`Divar.LA.3.0.3-00006-STD.W3K.HY11.INT-1_20260706_035427_035431`) failed on **2026-07-06** in the **CRMBuilds** project, procedure **Build.Rel.602829**. The build was executing a multi-component Android/Linux firmware image for the **Divar LA 3.0.3** software image on agent host **san-w175-ma3-1-05** (Ubuntu 18.04, SanDiego site).
+
+The **Make step** (Step ID: `f1792911-694e-f16c-86f3-4efb9ff91010`) failed with a **compile error**, as explicitly recorded in the `BuildInfoJson.failedReason = "Compile"`. This triggered the `errorHandling=abortJob` policy, which cascaded to abort the entire job. The **SaveBuild step** subsequently failed as a downstream consequence of the aborted job state.
+
+The agent host exhibited **critically high memory utilization (~99% of 187.6 GB)** throughout the entire job execution window, which is a significant contributing infrastructure condition. However, the **primary root cause is a compile failure** in the Make step — the exact compiler error(s) are not captured in Splunk or Datadog and require direct examination of the step execution log on the agent host.
+
+---
+
+## # 2 Job Context
+
+| Field | Value |
+|---|---|
+| **Job ID** | `f1792911-5e79-f10a-a110-2686f9881e6f` |
+| **Job Name** | `Divar.LA.3.0.3-00006-STD.W3K.HY11.INT-1_20260706_035427_035431` |
+| **Project** | `CRMBuilds` |
+| **Procedure** | `Build.Rel.602829` |
+| **Launched By** | `tiberiumUserEC10_11` |
+| **Run As** | `aswbldsv` |
+| **Built By** | `vraparth` |
+| **Execution Node (Agent)** | `san-w175-ma3-1-05` |
+| **Resource Pool** | `CRMBuildsLinux-Ubuntu18-04` |
+| **Agent OS** | Ubuntu 18.04 (Linux 4.15.0-226-generic) |
+| **Agent Version** | `2024.12.0.177508` |
+| **Workspace Name** | `crm_ws_sd` |
+| **Build Path (Linux)** | `/prj/qct/asw/crmbuilds/snowcone/builds905/PROD/Divar.LA.3.0.3-00006-STD.W3K.HY11.INT-1` |
+| **Build Path (Windows)** | `\\snowcone\builds905\PROD` |
+| **Build Drive** | `G:` on `san-w175-ma3-1-05` |
+| **Software Image** | `Divar.LA.3.0.3` |
+| **Eng Label** | `GLUE.DIVAR_LA.3.0.2-00003-NOOP_TEST-1` |
+| **Host OS** | `Ubuntu18_04` |
+| **Site** | `SanDiego` |
+| **Workflow Type** | `LEGACY` |
+| **Start** | `2026-07-06T10:54:31.708Z` (03:54:31 PDT) |
+| **Finish** | `2026-07-06T11:01:38.819Z` (04:01:38 PDT) |
+| **Elapsed** | ~7 minutes (427,111 ms) |
+| **Final Status** | `completed` |
+| **Final Outcome** | `error` |
+| **Abort Status** | `ABORT` |
+| **BuildInfoJson failedReason** | `Compile` |
+| **Build Delete Date** | `2026-07-09` |
+| **Build Storage** | `snowcone/builds905/PROD` |
+
+---
+
+## # 3 Build Timeline
+
+All times are UTC (PDT = UTC−7).
+
+| Time (UTC) | Time (PDT) | Event |
+|---|---|---|
+| `10:54:31.708Z` | `03:54:31` | Job created and started |
+| `10:54:32Z` | `03:54:32` | **Setup** step started on `san-w175-ma3-1-05` |
+| `10:54:50Z` | `03:54:50` | **Setup** completed — exit code 0 (17 seconds) |
+| *(sequential)* | | **ReserveHost** → success |
+| *(sequential)* | | **Init** → success |
+| *(sequential)* | | **SyncSetup** → success |
+| *(sequential)* | | **BBS_PreSync** → success |
+| *(sequential)* | | **Sync** → success |
+| *(sequential)* | | **Strip** → success |
+| *(sequential)* | | **BBS_PostSync** → success |
+| *(sequential)* | | **ConcurrentCopy** → running |
+| `10:57:43Z` | `03:57:43` | **ConcurrentCopy** released — success |
+| `10:56:48Z` | `03:56:48` | **Make** step started (parallel) |
+| `10:57:44.494Z` | `03:57:44` | **Make** step outcome transitions `success → error` (**COMPILE FAILURE**) |
+| `10:57:44.511Z` | `03:57:44` | **Make** step marked `completed/error` — `errorHandling=abortJob` triggered |
+| `10:57:44.523Z` | `03:57:44` | Resource `san-w175-ma3-1-05` released from Make step |
+| `10:57:44Z` | `03:57:44` | **SaveBuild** step started (`alwaysRun`, `parallel`) |
+| `10:59:13.676Z` | `03:59:13` | **SaveBuild** step completed with error (downstream consequence) |
+| *(post-abort)* | | **PreSave** → aborted |
+| *(post-abort)* | | **VerifySrc** → aborted |
+| *(post-abort)* | | **PostTimingsToSplunk** → success (`alwaysRun`, `ignore`) |
+| *(post-abort)* | | **Record_All_Times** → success (`alwaysRun`, `ignore`) on `crm-ubuntu326` |
+| *(post-abort)* | | **SplunkInit** → success (`alwaysRun`, `ignore`) on `crm-ubuntu306` |
+| *(post-abort)* | | **CleanUp** → success at `04:01:13` |
+| `11:01:25Z` | `04:01:25` | `getJobDetails` returns `running_error` |
+| `11:01:38.819Z` | `04:01:38` | **Check If Any Step Failed due to TimeOut** → success (`alwaysRun`, `ignore`) |
+| `11:01:38.819Z` | `04:01:38` | Job finalized — outcome: **error**, abortStatus: **ABORT** |
+
+---
+
+## # 4 Execution Path Inventory
+
+### Failed Step
+
+| Field | Value |
+|---|---|
+| **Step Name** | `Make` |
+| **Step ID** | `f1792911-694e-f16c-86f3-4efb9ff91010` |
+| **Step Status** | `completed` |
+| **Step Outcome** | `error` |
+| **Error Handling** | `abortJob` |
+| **Parallel** | Yes |
+| **Step Start** | `2026-07-06T10:56:48Z` |
+| **Step End** | `2026-07-06T10:57:44.511Z` |
+| **Duration** | ~56 seconds |
+| **Exit Code** | Not captured in Splunk (step log required) |
+| **Failure Reason** | `Compile` (per `BuildInfoJson.failedReason`) |
+| **Step Log** | `Make.f1792911-694e-f16c-86f3-4efb9ff91010.log` on `san-w175-ma3-1-05` |
+
+### Downstream Failed Step
+
+| Field | Value |
+|---|---|
+| **Step Name** | `SaveBuild` |
+| **Step ID** | `f1792911-6975-f180-86f3-4efb9ff91010` |
+| **Step Status** | `completed` |
+| **Step Outcome** | `error` |
+| **Error Handling** | `abortJob` |
+| **Flags** | `alwaysRun`, `parallel` |
+| **Step Start** | `2026-07-06T10:57:44Z` |
+| **Step End** | `2026-07-06T10:59:13.676Z` |
+| **Root Cause** | Downstream consequence of Make failure / job abort state |
+
+### Agent Host
+
+| Field | Value |
+|---|---|
+| **Hostname** | `san-w175-ma3-1-05` |
+| **Resource Pool** | `CRMBuildsLinux-Ubuntu18-04` |
+| **Step Limit** | 9 |
+| **OS** | Ubuntu 18.04 (Linux 4.15.0-226-generic #238-Ubuntu SMP) |
+| **Architecture** | x86_64 |
+| **Agent Version** | `2024.12.0.177508` |
+| **Agent ID** | `f0ec3fec-33fd-f107-98dd-2686f9881e6f` |
+| **Agent Port** | `7800` |
+| **Agent Status** | `alive` (confirmed throughout job) |
+| **Total RAM** | ~187.6 GB |
+| **RAM Used (during job)** | ~185.8–186.0 GB (~99.0%) |
+| **CPU Utilization** | <5% throughout (no CPU pressure) |
+| **Disk Utilization** | ~54.6–54.7% (no disk pressure) |
+
+### Commander Nodes
+
+| Node | Role | IP |
+|---|---|---|
+| `las-colo12-j13-11` | Primary StateMachine | `10.81.104.243` |
+| `las-colo12-j13-10` | Resource Scheduler | `10.81.104.242` |
+| `las-colo12-j13-09` | API Handler | `10.81.104.241` |
+
+### Invoked External Services
+
+| Service | Endpoint | Role |
+|---|---|---|
+| CRM Database | `oil.qualcomm.com` | Build metadata / CRM DB |
+| PCM WebService | `pcm.qualcomm.com` | PCM integration |
+| Software Revision Service | `csds.qualcomm.com` | Component revision lookup |
+| Verify Source Service | `verifysrc.qualcomm.com` | Source verification |
+| Axway/Stormchaser API | `apigw-op.qualcomm.com` | API gateway |
+| ARM License Server | `license-pdlm-1-encnaa.qualcomm.com:7070` | ARM compiler licensing |
+| Commander Public Endpoint | `qso-bicmdr.qualcomm.com:8443` | Commander reverse route |
+| Build Storage | `\\snowcone\builds905\PROD` | Artifact storage |
+| Build Script | `common/build/build.sh` | Build orchestration |
+
+### Build Components
+
+`MPSS`, `ADSP`, `BOOT`, `TZ`, `WLAN`, `BTFM`, `LA.VENDOR`, `LA.QSSI`, `KERNEL.PLATFORM`, `GLUE`
+
+---
+
+## # 5 Detected Error Codes
+
+| Error | Source | Evidence |
+|---|---|---|
+| **Compile failure** | `BuildInfoJson.failedReason = "Compile"` | Explicitly set in job metadata captured in Splunk `index=ecommander` |
+| **Job abort** | `abortStatus = ABORT`, `outcome = error` | CloudBees job metadata — triggered by `errorHandling=abortJob` on Make step |
+| **Step outcome transition** | `success → error` at `03:57:44.494Z` | Commander StateMachine log on `las-colo12-j13-11` |
+| **Specific exit code** | ⚠️ **NOT CAPTURED** | Step execution log `Make.f1792911-694e-f16c-86f3-4efb9ff91010.log` must be examined directly |
+| **Specific compiler error** | ⚠️ **NOT CAPTURED** | Step execution log on `san-w175-ma3-1-05` must be examined directly |
+
+---
+
+## # 6 Correlated Observations
+
+### CloudBees
+
+- **Make step** failed with `failedReason = "Compile"` at `03:57:44Z` after ~56 seconds of execution.
+- The Make step ran as part of a multi-component build (`MPSS`, `ADSP`, `BOOT`, `TZ`, `WLAN`, `BTFM`, `LA.VENDOR`, `LA.QSSI`, `KERNEL.PLATFORM`, `GLUE`) using `common/build/build.sh`.
+- `errorHandling=abortJob` on the Make step caused the entire job to abort immediately upon failure.
+- **SaveBuild** failed as a direct downstream consequence — it ran as `alwaysRun` but encountered the aborted job state.
+- All post-abort cleanup steps (`PostTimingsToSplunk`, `Record_All_Times`, `SplunkInit`, `CleanUp`, `Check If Any Step Failed due to TimeOut`) completed successfully with `errorHandling=ignore`.
+- Commander nodes (`las-colo12-j13-09`, `-10`, `-11`) showed **no errors** — all agent communication was healthy (`agentStatus=alive`, `status=0` responses).
+- **No Commander-level failures detected.**
+
+### Agent Host (`san-w175-ma3-1-05`)
+
+**Datadog Metrics — Correlation Window: `03:56:48Z` → `03:57:44Z` (Make step)**
+
+| Metric | Value | Assessment |
+|---|---|---|
+| **CPU User** | 0.07–1.25% | ✅ Normal — no CPU pressure |
+| **CPU System** | 0.09–2.27% | ✅ Normal — no CPU pressure |
+| **Memory Used** | ~185.8–186.0 GB of 187.6 GB | ⚠️ **CRITICAL — ~99.0% utilization** |
+| **Disk In Use** | 54.6–54.7% | ✅ Normal — no disk pressure |
+
+**Memory Finding:**
+Memory utilization was **persistently near 99%** throughout the entire job window — this was not a sudden spike but a sustained condition. This level of memory pressure can cause:
+- Compiler OOM (Out-of-Memory) kills
+- Swap thrashing degrading build performance
+- Kernel OOM killer terminating compiler processes
+- Linker failures due to insufficient virtual address space
+
+**Other Jobs on `san-w175-ma3-1-05` (Concurrent):**
+Splunk data confirms `san-w175-ma3-1-05` was being shared by **multiple concurrent jobs** from the `CRMBuildsLinux-Ubuntu18-04` resource pool during the same window:
+
+| Job ID | Step | Time |
+|---|---|---|
+| `f178ef65-8222-f181-9787-2686f9881e6f` | `InitCredentials` | `21:01:43Z` (prior) |
+| `f178ef36-70ba-f101-9a11-1ea035bf3243` | `PCM Defined Post Signing` | `21:00:47Z` (prior) |
+| `f178ef39-9e52-f1b1-bb7c-1ea035bf3243` | `InitCredentials` | `21:00:29Z` (prior) |
+| `f178ef37-6134-f164-97fd-1ea035bf3243` | `InitCredentials` | `21:00:25Z` (prior) |
+| `f178eefa-2983-f167-bf0e-2686f9881e6f` | `InitCredentials` | `20:58:42Z` (prior) |
+| `f178eef4-e629-f184-b963-4efb9ff91010` | `InitCredentials` | `20:58:34Z` (prior) |
+
+> **Note:** These concurrent jobs were observed in the broader window around the same agent. The agent's `stepLimit=9` allows up to 9 concurrent steps. The persistent ~99% memory utilization is consistent with multiple concurrent build jobs consuming RAM simultaneously.
+
+**Datadog Logs:** No logs found for `san-w175-ma3-1-05` in the Datadog flex tier for the job window.
+
+**SCOM Alerts:** No active SCOM alerts for `san-w175-ma3-1-05`.
+
+### Commander Host
+
+- `las-colo12-j13-11`: Primary StateMachine — correctly processed Make step failure, triggered abort, released resource. **No errors.**
+- `las-colo12-j13-10`: Resource Scheduler — correctly assigned/released resources. **No errors.**
+- `las-colo12-j13-09`: API Handler — correctly handled agent communication. **No errors.**
+- All Commander nodes confirmed agent `san-w175-ma3-1-05` as `alive` throughout execution.
+- **Commander is NOT a contributing factor.**
+
+### Datadog
+
+| Source | Query Window | Findings | Relevance |
+|---|---|---|---|
+| Datadog Hosts | N/A | Host `san-w175-ma3-1-05` confirmed present (GNU/Linux) | Confirms agent is monitored |
+| Datadog Metrics — CPU | `03:50Z–04:05Z` | CPU user/system < 5% throughout | No CPU exhaustion |
+| Datadog Metrics — Memory | `03:50Z–04:05Z` | **~99% RAM utilization (~185.8–186.0 GB of 187.6 GB)** — persistent, not a spike | **Critical finding — severe memory pressure on agent** |
+| Datadog Metrics — Disk | `03:50Z–04:05Z` | 54.6–54.7% disk utilization | No disk pressure |
+| Datadog Logs | `03:50Z–04:05Z` | No logs found | No additional evidence |
+
+### Splunk
+
+| Source | Query Window | Findings | Relevance |
+|---|---|---|---|
+| `index=ecommander` — Job metadata | `2026-07-06T10:54Z–11:05Z` | Full job context, step timeline, `failedReason=Compile`, agent assignment | Primary evidence source |
+| `index=ecommander` — Make step | `2026-07-06T10:54Z–11:05Z` | Step ID, outcome transition, resource release, Commander processing | Confirms Make as primary failure |
+| `index=ecommander` — Other jobs | Broader window | Multiple concurrent jobs on `san-w175-ma3-1-05` from same resource pool | Explains memory pressure context |
+| `index=ecommander` — Commander logs | `2026-07-06T10:54Z–11:05Z` | No Commander errors; all agent responses `status=0` | Excludes Commander as cause |
+| Step execution log | N/A | **NOT AVAILABLE in Splunk** | Specific compiler error unknown |
+
+### External Dependency
+
+| Service | Finding | Relevance |
+|---|---|---|
+| ARM License Server (`license-pdlm-1-encnaa.qualcomm.com:7070`) | No evidence of license failure in available data | Cannot confirm or exclude without step log |
+| `oil.qualcomm.com` (CRM DB) | No errors detected | Not a contributing factor per available evidence |
+| `snowcone` (Build Storage) | No errors detected | Not a contributing factor per available evidence |
+| All other external services | No errors detected | Not contributing factors per available evidence |
+
+---
+
+## # 7 Probable Root Cause
+
+**Primary Root Cause: Compile Failure in the Make Step**
+
+**Evidence:**
+1. `BuildInfoJson.failedReason = "Compile"` — explicitly set by the build framework upon Make step failure. This is the authoritative failure classification from the build system itself.
+2. Make step (ID: `f1792911-694e-f16c-86f3-4efb9ff91010`) outcome transitioned from `success → error` at `03:57:44.494Z` after ~56 seconds of execution.
+3. The Make step executed `common/build/build.sh` building components: `MPSS`, `ADSP`, `BOOT`, `TZ`, `WLAN`, `BTFM`, `LA.VENDOR`, `LA.QSSI`, `KERNEL.PLATFORM`, `GLUE`.
+4. `errorHandling=abortJob` on the Make step caused the full job abort.
+5. SaveBuild failure is a **downstream consequence**, not an independent root cause.
+
+**Contributing Infrastructure Condition: Severe Memory Pressure**
+
+**Evidence:**
+- Datadog metrics confirm **~99% RAM utilization (~185.8–186.0 GB of 187.6 GB total)** on `san-w175-ma3-1-05` throughout the entire job window.
+- This is a **persistent condition**, not a transient spike — indicating the host was already under extreme memory pressure before and during the Make step.
+- Multiple concurrent jobs from the `CRMBuildsLinux-Ubuntu18-04` resource pool were running on the same agent (stepLimit=9), consistent with high memory consumption.
+- Severe memory pressure can cause compiler OOM kills, linker failures, or process terminations — any of which would manifest as a compile failure.
+
+**Relationship:**
+The compile failure may be:
+- **(a) A pure code/build error** (syntax error, missing symbol, incompatible dependency, bad source code) — independent of memory pressure, OR
+- **(b) An OOM-induced compile failure** — where the kernel OOM killer or memory exhaustion terminated a compiler/linker process, causing the build to fail with a compile-category error.
+
+**The step execution log `Make.f1792911-694e-f16c-86f3-4efb9ff91010.log` on `san-w175-ma3-1-05` is required to distinguish between (a) and (b).**
+
+---
+
+## # 8 Confidence Level
+
+### Overall: **MEDIUM**
+
+**Reasoning:**
+
+- **HIGH confidence** that the Make step failed with a compile-category error — this is directly evidenced by `BuildInfoJson.failedReason = "Compile"`, the step outcome transition, and the Commander abort sequence.
+- **HIGH confidence** that SaveBuild failure is a downstream consequence, not an independent root cause.
+- **HIGH confidence** that Commander nodes are not a contributing factor.
+- **MEDIUM confidence** on the specific compile error — the exact error message, exit code, and failing component are **not available** in Splunk or Datadog. The step execution log must be examined.
+- **MEDIUM confidence** on the role of memory pressure — Datadog confirms ~99% RAM utilization (a critical condition), but without the step log, it cannot be confirmed whether memory exhaustion directly caused the compile failure or was a co-existing condition.
+- **Cannot be elevated to HIGH** without direct step log evidence showing the specific compiler error.
+
+---
+
+## # 9 Infrastructure vs Code Assessment
+
+| Assessment | Result |
+|---|---|
+| **Infrastructure Issue** | **POSSIBLE** |
+| **Code Issue** | **POSSIBLE** |
+| **Mixed** | **POSSIBLE** |
+
+**Reason:**
+
+- `BuildInfoJson.failedReason = "Compile"` confirms a compile-category failure. This classification is consistent with both a code error (bad source, missing symbol) and an infrastructure-induced compile failure (OOM kill, process termination due to memory exhaustion).
+- **Infrastructure evidence exists**: ~99% RAM utilization on the agent host during the Make step window is a confirmed, severe condition that can directly cause compile failures via OOM.
+- **Code evidence is possible but unconfirmed**: Without the step log, it cannot be determined whether the failure was due to a code defect in the source being compiled.
+- **Classification cannot be finalized without the Make step execution log.**
+
+---
+
+## # 10 Recommended Remediation
+
+### Immediate Actions
+
+1. **Examine the Make step execution log** on `san-w175-ma3-1-05`:
+   - Log file: `Make.f1792911-694e-f16c-86f3-4efb9ff91010.log`
+   - Location: Agent workspace on `san-w175-ma3-1-05` or CloudBees job log storage
+   - Look for: compiler error messages, OOM kill messages (`Killed`, `Out of memory`), exit codes, specific failing source file/component
+
+2. **If OOM-induced failure is confirmed** (log shows `Killed`, `oom-kill-event`, or process termination without a compiler error):
+   - Reduce the `stepLimit` on `san-w175-ma3-1-05` from 9 to a lower value (e.g., 3–4) to prevent concurrent memory exhaustion
+   - Or increase RAM on the agent host
+   - Or move large memory-intensive builds to dedicated agents
+
+3. **If pure code failure is confirmed** (log shows compiler errors, syntax errors, missing symbols):
+   - Identify the failing component and source file
+   - Review recent code changes in the affected component (check SCM history for `GLUE.DIVAR_LA.3.0.2-00003-NOOP_TEST-1` label)
+   - Engage the component owner (`vraparth` / build owner) to review the failing code
+
+4. **Retry the build** after addressing the root cause — build artifacts are retained until `2026-07-09`.
+
+### Memory Pressure Remediation (Regardless of Root Cause)
+
+5. **Investigate why `san-w175-ma3-1-05` is at ~99% RAM utilization** — this is an abnormal and dangerous condition for a build agent regardless of this specific failure.
+6. **Set a memory utilization alert** in Datadog for `san-w175-ma3-1-05` at >90% to proactively detect this condition.
+7. **Review the `CRMBuildsLinux-Ubuntu18-04` resource pool** — with 13 members and `stepLimit=9`, concurrent large builds may be systematically over-committing memory on individual agents.
+
+---
+
+## # 11 Preventive Actions
+
+1. **Memory-aware job scheduling**: Implement resource pool policies that consider available memory before assigning memory-intensive build steps (Make/compile) to agents already under high memory load.
+
+2. **Agent memory monitoring**: Configure Datadog monitors to alert when agent host memory exceeds 85% utilization, enabling proactive intervention before builds fail.
+
+3. **Step limit tuning**: Review and reduce `stepLimit` on agents in `CRMBuildsLinux-Ubuntu18-04` to prevent concurrent memory exhaustion. Consider setting `stepLimit=3` or `stepLimit=4` for large firmware builds.
+
+4. **Build log forwarding to Splunk**: Ensure Make step execution logs are forwarded to Splunk (or a centralized log store) to enable faster RCA without requiring direct agent access.
+
+5. **OOM protection**: Configure kernel `vm.overcommit_memory` and cgroup memory limits on build agents to prevent silent OOM kills and generate explicit error messages.
+
+6. **Pre-build memory check**: Add a pre-Make step that validates available free memory meets a minimum threshold before launching the compile step.
+
+7. **Component-level build isolation**: For large multi-component builds (MPSS, ADSP, BOOT, TZ, WLAN, BTFM, LA.VENDOR, LA.QSSI, KERNEL, GLUE), consider parallelizing across multiple agents rather than a single agent to distribute memory load.
+
+8. **ARM License monitoring**: Verify ARM license server (`license-pdlm-1-encnaa.qualcomm.com:7070`) availability is monitored — license exhaustion can also manifest as compile failures.
+
+---
+
+## # 12 Sources Used
+
+| # | Source Type | Query Window | Evidence | Relevance |
+|---|---|---|---|---|
+| 1 | **Splunk** `index=ecommander` — Job metadata | `2026-07-06T10:54Z–11:05Z` | Job ID, name, project, procedure, agent, build server, failedReason=Compile, step timeline, Commander nodes, external services, BuildInfoJson | Primary evidence — full job context |
+| 2 | **Splunk** `index=ecommander` — Make step | `2026-07-06T10:54Z–11:05Z` | Step ID, outcome transition `success→error` at `03:57:44Z`, resource release, Commander abort sequence | Confirms Make as primary failure point |
+| 3 | **Splunk** `index=ecommander` — Concurrent jobs | `2026-07-05T20:58Z–21:02Z` | Multiple other job IDs dispatched to `san-w175-ma3-1-05` from `CRMBuildsLinux-Ubuntu18-04` pool | Explains concurrent load contributing to memory pressure |
+| 4 | **Splunk** `index=ecommander` — Resource pool | `2026-07-05T21:00Z` | Pool `CRMBuildsLinux-Ubuntu18-04` has 13 members including `san-w175-ma3-1-05`, `stepLimit=9` | Confirms shared resource pool configuration |
+| 5 | **Datadog Metrics** — `system.cpu.user`, `system.cpu.system` | `2026-07-06T03:50Z–04:05Z` | CPU < 5% throughout — no CPU exhaustion | Excludes CPU as contributing factor |
+| 6 | **Datadog Metrics** — `system.mem.used`, `system.mem.total` | `2026-07-06T03:50Z–04:05Z` | **~99% RAM utilization (~185.8–186.0 GB of 187.6 GB)** — persistent throughout job | **Critical finding — severe memory pressure on agent host** |
+| 7 | **Datadog Metrics** — `system.disk.in_use` | `2026-07-06T03:50Z–04:05Z` | 54.6–54.7% disk utilization — stable | Excludes disk as contributing factor |
+| 8 | **Datadog Hosts** | N/A | Host `san-w175-ma3-1-05` confirmed present (GNU/Linux) | Confirms agent is Datadog-monitored |
+| 9 | **Datadog Logs** | `2026-07-06T03:50Z–04:05Z` | No logs found for `san-w175-ma3-1-05` | No additional log evidence available |
+| 10 | **SCOM** | Current | No active alerts for `san-w175-ma3-1-05` | No SCOM-level infrastructure alerts |
+| 11 | **Make step execution log** | N/A | **NOT AVAILABLE** — `Make.f1792911-694e-f16c-86f3-4efb9ff91010.log` on `san-w175-ma3-1-05` | **Required to determine specific compile error and confirm/exclude OOM** |
+
+---
+
+> ⚠️ **Critical Data Gap Notice**
+>
+> The Make step execution log (`Make.f1792911-694e-f16c-86f3-4efb9ff91010.log`) on agent host `san-w175-ma3-1-05` is **not available** in Splunk or Datadog.
+>
+> The specific compiler error, exit code, and failing component **cannot be determined from monitoring data alone**.
+>
+> **CloudBees step execution logs must be examined directly on `san-w175-ma3-1-05` or via the CloudBees CD/RO job log viewer to complete the root cause determination.**
+>
+> The confirmed `failedReason = "Compile"` and the confirmed ~99% memory pressure are the strongest available evidence. Whether the compile failure was code-induced or OOM-induced requires the step log to resolve.

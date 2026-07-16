@@ -1,0 +1,325 @@
+---
+job_id: f1792a36-69b2-f188-8e2f-1ea035bf3243
+chat_id: 1HEMW3RZ7D75RTGFH2H0
+generated_at: 2026-07-07T20:44:26.158640
+source: NOVA
+partial_response: False
+---
+
+I now have all the evidence needed to produce a comprehensive, fully evidence-backed RCA report. I have the complete `BuildInfoJson` with `"failedReason":"Compile"`, the full step state machine transitions, the `NoSuchProperty` error for `/myJob/SourceViolationRequired`, the abort chain, and the agent host details. Let me compile the final report.
+
+---
+
+# CloudBees CD/RO — Root Cause Analysis Report
+
+---
+
+## # 1 Summary
+
+**Job `f1792a36-69b2-f188-8e2f-1ea035bf3243`** (`Hawi.LA.1.0-00543-PERF.INT-2_20260706_040220_040243`) in project **CRMBuilds**, procedure **Build.Rel.602829**, failed on **2026-07-06** with a final outcome of **error / ABORT** after 5 minutes and 40 seconds of execution.
+
+The build's own `BuildInfoJson` property explicitly records **`"failedReason":"Compile"`** — a compile-time failure during the `Make` step. The `Make` step completed with `outcome=error` and its `errorHandling=abortJob` policy triggered an immediate job abort. The concurrently running `VerifySrc` step was forcibly aborted mid-execution (code `ABORTED`) as a consequence. The `SaveBuild` step ran as `alwaysRun` but also failed, consistent with the upstream compile failure leaving no valid artifacts to save.
+
+A secondary finding — a `NoSuchProperty` error for `/myJob/SourceViolationRequired` in `VerifySrc` at `04:04:16Z` — is noted but is **not the primary root cause**; `VerifySrc` was aborted by the `Make` failure before it could complete its own logic.
+
+The CloudBees Commander cluster and agent host showed **no infrastructure anomalies** during the execution window. No Datadog telemetry was available for the agent host `crm-ubuntulv42`.
+
+**Root Cause: Compile Failure in the `Make` step.**
+
+---
+
+## # 2 Job Context
+
+| Field | Value |
+|---|---|
+| **Job ID** | `f1792a36-69b2-f188-8e2f-1ea035bf3243` |
+| **Job Name** | `Hawi.LA.1.0-00543-PERF.INT-2_20260706_040220_040243` |
+| **Build ID** | `Hawi.LA.1.0-00543-PERF.INT-2` |
+| **Project** | `CRMBuilds` |
+| **Procedure** | `Build.Rel.602829` |
+| **Launched By** | `tiberiumUserEC10_11` |
+| **Run As** | `aswbldsv` |
+| **Built By (BuildInfoJson)** | `scmbldsv` |
+| **Execution Node (Agent)** | `crm-ubuntulv42` |
+| **Agent Resource ID** | `f0ec3fac-0049-f147-aa97-2686f9881e6f` |
+| **Agent OS** | Linux Ubuntu 22.04 (`5.15.0-173-generic`) |
+| **Agent Version** | `2024.12.0.177508` |
+| **Resource Pool** | `CRMBuildsLinux-Ubuntu22-04_LV` |
+| **Agent Zone** | `PROXY` |
+| **Workspace (Unix)** | `/prj/qct/pwlv2/Hawi.LA.1.0-00543-PERF.INT-2_20260706_040220_040243` |
+| **Working Directory** | `/local/mnt/workspace/CRMBuilds/Hawi.LA.1.0-00543-PERF.INT-2_20260706_040220` |
+| **Build Location (Filer)** | `\\chipwich\scratch_builds001\PROD` |
+| **Linux Location** | `/prj/qct/asw/crmbuilds/chipwich/scratch_builds001/PROD/Hawi.LA.1.0-00543-PERF.INT-2` |
+| **Commander Primary Node** | `las-colo12-j13-10` (`10.81.104.242`) |
+| **Commander Node 2** | `las-colo12-j13-09` (`10.81.104.241`) |
+| **Commander Node 3** | `las-colo12-j13-11` (`10.81.104.243`) |
+| **Commander Endpoint** | `qso-bicmdr.qualcomm.com:8443` |
+| **Start** | `2026-07-06T11:02:43Z` (UTC) / `04:02:43 PDT` |
+| **Finish** | `2026-07-06T11:08:23Z` (UTC) / `04:08:23 PDT` |
+| **Elapsed** | ~5 min 40 sec (`340,490 ms`) |
+| **Final Status** | `completed` |
+| **Final Outcome** | `error` |
+| **Abort Status** | `ABORT` |
+| **Software Image** | `Hawi.LA.1.0` |
+| **Client** | `PERF.INT` |
+| **Site** | `LasVegas` |
+| **Eng Label** | `GLUE.HAWI_LA.1.0-00379-NOOP_TEST_HAWI-2` |
+| **Host OS** | `Ubuntu22_04` |
+| **Workflow Type** | `LEGACY` |
+| **Stored On** | `Filer` |
+| **Build Delete Date** | `2026-07-09T04:03:20.5` |
+
+---
+
+## # 3 Build Timeline
+
+All times in UTC (PDT = UTC−7).
+
+| Time (UTC) | Event |
+|---|---|
+| `11:02:43.354Z` | Job created and started. `createTime` confirmed on Commander `las-colo12-j13-10`. |
+| `11:02:53Z` | Property `BldSrvr` set to `crm-ubuntulv42`; `BldSrvrDrive` set to `G:`. |
+| `11:02:57Z` | Property `Abort` set to `1`. |
+| `11:03:08Z` | Property `ArtifactCheckInCondition` set to `1`. |
+| `11:03:20Z` | `BuildInfoJson.builtOn` timestamp — build environment initialized on agent. |
+| `11:04:08.546Z` | Steps **Make** (`f1792a36-765d-f11f-9ffe-1ea035bf3243`) and **VerifySrc** (`f1792a36-7636-f10d-9ffe-1ea035bf3243`) dispatched **in parallel** to `crm-ubuntulv42`. Both have `errorHandling=abortJob`. |
+| `11:04:08.546Z` | **VerifySrc** transitions to `running`. |
+| `11:04:16Z` | Commander node `las-colo12-j13-11` logs `NoSuchProperty` error: property `/myJob/SourceViolationRequired` does not exist — encountered during `VerifySrc` execution. |
+| `11:05:26Z` | **Make** completes with `outcome=error` → `errorHandling=abortJob` triggers job abort. Resource usage record for `crm-ubuntulv42` deleted. |
+| `11:05:26Z` | **VerifySrc** receives `AbortStepOperation` while still running; transitions from `outcome=success` → `outcome=error`, code=`ABORTED`. |
+| `11:05:30Z` | **VerifySrc** finalized as `completed/error/ABORTED`. `crm-ubuntulv42` released (`stepCount=3`, `stepLimit=9`). |
+| `11:05:52Z` | **SaveBuild** completes with `outcome=error` (`alwaysRun`, `errorHandling=abortJob`). |
+| `11:08:09Z` | Step **Record_All_Times** completes with `outcome=success` (`alwaysRun`, `errorHandling=ignore`). |
+| `11:08:14Z` | Step **Call API** completes with `outcome=success` (`alwaysRun`). Agent `crm-ubuntu316` released (`stepCount=7`, `stepLimit=9`). |
+| `11:08:14Z` | **`BuildInfoJson`** property written to Commander (`las-colo12-j13-11`): `"status":"Failed"`, **`"failedReason":"Compile"`**. |
+| `11:08:17Z` | `getJobDetails` API response confirms `errorMessage`: *"Job error [Aborted]: step 'Make' failed and its error handling aborted the job. Job error [Aborted]: step 'VerifySrc' failed and its error handling aborted the job. Job error [Aborted]: step 'SaveBuild' failed and its error handling aborted the job."* |
+| `11:08:23.972Z` | Job finalized as `completed/error/ABORT` on `las-colo12-j13-10`. |
+
+---
+
+## # 4 Execution Path Inventory
+
+| Component | Role | Evidence |
+|---|---|---|
+| **Step: Make** | Primary failing step — compile execution | `outcome=error`, `errorHandling=abortJob`, dispatched to `crm-ubuntulv42` at `11:04:08Z` |
+| **Step: VerifySrc** | Parallel step — aborted as consequence of Make failure | `outcome=error`, code=`ABORTED`, `AbortStepOperation` received at `11:05:26Z` |
+| **Step: SaveBuild** | Post-failure cleanup step — failed due to no valid artifacts | `outcome=error`, `alwaysRun`, `errorHandling=abortJob` |
+| **Agent Host: crm-ubuntulv42** | Execution host for Make and VerifySrc | Resource ID `f0ec3fac-0049-f147-aa97-2686f9881e6f`, Ubuntu 22.04, zone PROXY |
+| **Agent Host: crm-ubuntu316** | Execution host for Call API and other steps | Resource ID `f0ec3f82-1fc3-f1e3-ba41-2686f9881e6f`, stepCount=7/9 at release |
+| **Commander: las-colo12-j13-10** | Primary Commander node — job orchestration | Logged job completion, state machine transitions |
+| **Commander: las-colo12-j13-11** | Secondary Commander node — API dispatch | Logged `NoSuchProperty` error, wrote `BuildInfoJson` |
+| **Commander: las-colo12-j13-09** | Secondary Commander node | Resource usage events |
+| **Filer: chipwich\scratch_builds001\PROD** | Build artifact storage | Referenced in `BuildInfoJson.location` |
+| **Build Script** | `common/build/build.sh` with 30+ component arguments | Referenced in `BuildInfoJson.buildCommand` |
+
+---
+
+## # 5 Detected Error Codes
+
+| Error | Step | Time | Evidence Source | Detail |
+|---|---|---|---|---|
+| **`outcome=error` / `errorHandling=abortJob`** | `Make` | `11:05:26Z` | Splunk `ecommander` — StateMachine logs, `las-colo12-j13-10` | Make step completed with error; triggered job abort chain |
+| **`ABORTED`** | `VerifySrc` | `11:05:26Z–11:05:30Z` | Splunk `ecommander` — StateMachine logs, `las-colo12-j13-10` | `AbortStepOperation` received mid-execution; transitioned `success→error/ABORTED` |
+| **`outcome=error`** | `SaveBuild` | `11:05:52Z` | Splunk `ecommander` — StateMachine logs | `alwaysRun` step failed; no valid artifacts from failed Make |
+| **`NoSuchProperty`** | `VerifySrc` | `11:04:16Z` | Splunk `ecommander` — `las-colo12-j13-11`, `RequestProcessorImpl` | Property `/myJob/SourceViolationRequired` does not exist |
+| **`"failedReason":"Compile"`** | Job-level | `11:08:14Z` | Splunk `ecommander` — `BuildInfoJson` property, `las-colo12-j13-11` | Authoritative build system classification of failure type |
+| **`"status":"Failed"`** | Job-level | `11:08:14Z` | Splunk `ecommander` — `BuildInfoJson` property | Build system confirmed failed status |
+| **Job error [Aborted]** | Job-level | `11:08:17Z` | Splunk `ecommander` — `getJobDetails` API response | Three-step abort chain confirmed in `errorMessage` field |
+
+---
+
+## # 6 Correlated Observations
+
+### CloudBees
+
+**Finding 1 — Make Step Compile Failure (PRIMARY)**
+- **Evidence:** `BuildInfoJson` property written at `11:08:14Z` explicitly states `"failedReason":"Compile"`. The `Make` step completed with `outcome=error` at `11:05:26Z`. `errorHandling=abortJob` was set on the step.
+- **Step Log Files (on agent):** `Make.f1792a36-765d-f11f-9ffe-1ea035bf3243.log` — contains the actual compiler error output. **Not available in Splunk; must be examined directly on `crm-ubuntulv42`.**
+- **Confidence:** HIGH — `BuildInfoJson.failedReason` is the authoritative build system classification.
+
+**Finding 2 — VerifySrc NoSuchProperty Error (SECONDARY)**
+- **Evidence:** At `11:04:16Z`, Commander node `las-colo12-j13-11` logged a `NoSuchProperty` error: *"Property '/myJob/SourceViolationRequired' does not exist."* This occurred during `VerifySrc` execution, 1 minute 10 seconds before `Make` failed.
+- **Assessment:** This error is a **secondary finding**. `VerifySrc` was running in parallel with `Make`. The `VerifySrc` step was ultimately aborted by the `Make` failure abort chain, not by this property error. Whether this property error would have independently caused `VerifySrc` to fail cannot be determined from available data — the abort arrived first.
+- **Confidence:** MEDIUM — property error is confirmed; its independent impact is unknown.
+
+**Finding 3 — Abort Chain**
+- **Evidence:** `getJobDetails` API response at `11:08:17Z` confirms three-step abort message: *"step 'Make' failed and its error handling aborted the job"*, *"step 'VerifySrc' failed and its error handling aborted the job"*, *"step 'SaveBuild' failed and its error handling aborted the job."*
+- **Assessment:** Standard CloudBees abort propagation. `VerifySrc` and `SaveBuild` failures are **consequences** of the `Make` failure, not independent root causes.
+
+**Finding 4 — Parallel Step Dispatch**
+- **Evidence:** Both `Make` and `VerifySrc` were dispatched in parallel to `crm-ubuntulv42` at `11:04:08Z`. `VerifySrc` step ID: `f1792a36-7636-f10d-9ffe-1ea035bf3243`; `Make` step ID: `f1792a36-765d-f11f-9ffe-1ea035bf3243`.
+- **Step Log Files:** `VerifySrc.f1792a36-7636-f10d-9ffe-1ea035bf3243.log` also on `crm-ubuntulv42`.
+
+---
+
+### Agent Host (`crm-ubuntulv42`)
+
+**Finding — No Infrastructure Anomalies Detected**
+- **Evidence:** Agent `crm-ubuntulv42` had `stepCount=3` of `stepLimit=9` at the time of `VerifySrc` release — well within capacity. No resource exhaustion indicated.
+- **Datadog:** No telemetry data returned for `crm-ubuntulv42` in Datadog host inventory. Host is not registered in Datadog.
+- **SCOM:** No active SCOM alerts for `crm-ubuntulv42`.
+- **Assessment:** No evidence of CPU, memory, disk, or network issues on the agent host during the execution window.
+
+> **Agent host `crm-ubuntulv42` has no Datadog telemetry coverage.**
+> Root cause cannot be determined from monitoring data alone for agent-level metrics.
+> CloudBees step execution logs (`Make.f1792a36-765d-f11f-9ffe-1ea035bf3243.log`) must be examined directly on the agent.
+
+**Other Jobs on crm-ubuntulv42 (Same Window):**
+- Job `f179656b-87dd-f194-9141-1ea035bf3243` — 11 successful steps on `crm-ubuntulv42`, `11:06:58–11:09:17Z`. **No overlap with target job's failure window (`11:04:08–11:05:52Z`). No contribution to failure.**
+- Job `f179622e-4e86-f153-bf7d-4efb9ff91010` — 5 successful steps, `11:00:51–11:05:08Z`. **Minimal overlap; no errors; no contribution to failure.**
+
+---
+
+### Commander Host
+
+**Finding — Commander Operating Normally**
+- **Evidence:** Commander node `las-colo12-j13-10` CPU at 30% (`jobCompleted`), 36% (`stepEvent`). DB queries 3–34ms. All Hibernate operations completed in 0–16ms. No Commander errors, no connectivity failures, no timeout events.
+- **Assessment:** Commander cluster performed normally throughout the job execution window. Commander is **not a contributing factor**.
+
+**Note on `crm-ubuntu316` stepLimitReached (OUT_OF_SCOPE):**
+- Splunk returned data showing `crm-ubuntu316` at `stepCount=9/stepLimit=9` (100% capacity) at `11:09:48–11:09:59Z`. This is **after the target job's failure window** (`11:05:52Z` latest) and involves a **different resource** (`crm-ubuntu316`, not `crm-ubuntulv42`). **EXCLUDED — OUT_OF_SCOPE.**
+
+---
+
+### Datadog
+
+**Finding — No Relevant Data**
+- Agent host `crm-ubuntulv42` returned zero results in Datadog host inventory query.
+- No Datadog alerts referencing Job ID `f1792a36-69b2-f188-8e2f-1ea035bf3243`, build name `Hawi.LA.1.0-00543-PERF.INT-2`, or agent host `crm-ubuntulv42` were found.
+- **No relevant findings.**
+
+---
+
+### Splunk
+
+**Finding — Primary Evidence Source**
+- Source: `index=ecommander`, sourcetype `ec_debug`
+- Query Window: `2026-07-06T11:02:43Z` → `2026-07-06T11:08:23Z`
+- Evidence: Full job metadata, step state machine transitions, `BuildInfoJson` with `failedReason=Compile`, `NoSuchProperty` error, abort chain, agent resource release events.
+- **Confidence: HIGH**
+
+---
+
+### External Dependency
+
+**Filer (`chipwich\scratch_builds001\PROD`)**
+- Referenced in `BuildInfoJson.location` as the artifact storage target.
+- `SaveBuild` failed — consistent with no valid artifacts being produced by the failed `Make` step.
+- No direct evidence of filer connectivity failure. Failure is attributable to upstream compile failure, not filer unavailability.
+- **No relevant independent findings.**
+
+---
+
+## # 7 Probable Root Cause
+
+**Primary Root Cause: Compile Failure in the `Make` Step**
+
+**Supporting Evidence:**
+
+1. **`BuildInfoJson.failedReason = "Compile"`** — Written at `11:08:14Z` by the build system's own `GetBuildInfo` step. This is the authoritative, build-system-generated classification of the failure reason. Source: Splunk `ecommander`, `las-colo12-j13-11`.
+
+2. **`Make` step `outcome=error`** — The `Make` step (step ID `f1792a36-765d-f11f-9ffe-1ea035bf3243`) completed with `outcome=error` at `11:05:26Z`. `errorHandling=abortJob` was configured, triggering the abort chain. Source: Splunk `ecommander`, StateMachine logs, `las-colo12-j13-10`.
+
+3. **`getJobDetails` errorMessage** — *"Job error [Aborted]: step 'Make' failed and its error handling aborted the job"* — confirmed in the CloudBees API response at `11:08:17Z`. Source: Splunk `ecommander`, `XmlApiRequestHandler`, `las-colo12-j13-10`.
+
+4. **Abort Chain** — `VerifySrc` and `SaveBuild` failures are **downstream consequences** of the `Make` failure, not independent root causes.
+
+**The specific compiler error(s) that caused `Make` to fail are contained in the step log file:**
+`Make.f1792a36-765d-f11f-9ffe-1ea035bf3243.log` on agent `crm-ubuntulv42` (working directory: `/local/mnt/workspace/CRMBuilds/Hawi.LA.1.0-00543-PERF.INT-2_20260706_040220`).
+
+**Secondary Finding (Not Root Cause): `NoSuchProperty` for `/myJob/SourceViolationRequired`**
+- Occurred in `VerifySrc` at `11:04:16Z`, 1 minute 10 seconds before `Make` failed.
+- `VerifySrc` was aborted by the `Make` failure before its own logic could complete.
+- This missing property may indicate a procedure configuration issue but is **not the primary root cause** of the job failure.
+
+---
+
+## # 8 Confidence Level
+
+### **MEDIUM–HIGH**
+
+**Reason:**
+
+- **HIGH confidence** that the root cause category is **Compile Failure**: The `BuildInfoJson.failedReason="Compile"` field is the build system's own authoritative classification, written by the `GetBuildInfo` step after examining the build output. The `Make` step failure and abort chain are confirmed by multiple independent Splunk log entries.
+
+- **MEDIUM** on the specific compiler error: The exact compiler error message, exit code, and failing source file(s) are **not available in Splunk**. They reside in the step log file `Make.f1792a36-765d-f11f-9ffe-1ea035bf3243.log` on agent `crm-ubuntulv42`, which was not accessible through the available monitoring tools.
+
+- No infrastructure anomalies were found that could elevate or reduce confidence in the compile failure classification.
+
+---
+
+## # 9 Infrastructure vs Code Assessment
+
+| Assessment | Result |
+|---|---|
+| **Infrastructure Issue** | **NO** |
+| **Code Issue** | **YES** |
+| **Mixed** | **NO** |
+
+**Reason:**
+
+- **Code Issue = YES:** `BuildInfoJson.failedReason="Compile"` is direct evidence of a code/compile failure. The `Make` step failed with `outcome=error`. No infrastructure anomalies (CPU, memory, disk, network, agent connectivity, Commander errors) were detected during the execution window.
+
+- **Infrastructure Issue = NO:** Agent `crm-ubuntulv42` was at `stepCount=3/9` — well within capacity. Commander nodes operated normally (CPU 30–36%, DB queries 0–34ms). No SCOM alerts. No Datadog telemetry anomalies. No filer connectivity errors.
+
+- **Mixed = NO:** No evidence supports a mixed classification.
+
+---
+
+## # 10 Recommended Remediation
+
+1. **Examine the Make Step Log (IMMEDIATE)**
+   - Retrieve `Make.f1792a36-765d-f11f-9ffe-1ea035bf3243.log` from agent `crm-ubuntulv42` at path `/local/mnt/workspace/CRMBuilds/Hawi.LA.1.0-00543-PERF.INT-2_20260706_040220`.
+   - Identify the specific compiler error(s), failing source file(s), and exit code.
+
+2. **Review Source Code Changes**
+   - Examine the source revision `00543` for `Hawi.LA.1.0` and the associated eng label `GLUE.HAWI_LA.1.0-00379-NOOP_TEST_HAWI-2`.
+   - Review recent commits to identify the change that introduced the compile error.
+
+3. **Investigate `NoSuchProperty` for `/myJob/SourceViolationRequired`**
+   - Verify whether the property `SourceViolationRequired` is expected to be set by an upstream step (e.g., `Setup`, `Init`, `SyncSetup`) before `VerifySrc` runs.
+   - If the property is missing due to a procedure configuration change, update the procedure to ensure the property is initialized before `VerifySrc` is dispatched.
+   - This is a **secondary issue** but should be resolved to prevent `VerifySrc` from failing independently in future runs.
+
+4. **Review Build Command Components**
+   - The `buildCommand` in `BuildInfoJson` references 30+ component builds (e.g., `apps_kernel`, `modem`, `btfw_cng_v2`, `tmel_cng`, etc.). Identify which component's source caused the compile failure.
+
+5. **Re-run the Build**
+   - After identifying and fixing the compile error, re-trigger the build for `Hawi.LA.1.0-00543-PERF.INT-2` (spin 3).
+
+---
+
+## # 11 Preventive Actions
+
+1. **Pre-flight Property Validation**
+   - Add a validation step early in the procedure (before `VerifySrc`) to verify that all required job properties (including `SourceViolationRequired`) are set. Fail fast with a clear error message rather than a `NoSuchProperty` exception mid-execution.
+
+2. **Compile Error Surfacing in Splunk**
+   - Configure the CloudBees agent to forward step log output (or at minimum, exit codes and error summaries) to Splunk for the `Make` step. This would allow Splunk-based RCA to identify the specific compiler error without requiring direct agent log access.
+
+3. **Pre-commit Build Validation**
+   - Enforce pre-commit or pre-merge compile checks for the `Hawi.LA.1.0` software image to catch compile errors before they reach the full integration build pipeline.
+
+4. **Component-Level Build Isolation**
+   - Consider breaking the monolithic `Make` step into per-component build steps to enable faster identification of which component introduced the compile failure.
+
+5. **Monitor `SourceViolationRequired` Property Population**
+   - Add a CloudBees monitor or assertion to verify that the `SourceViolationRequired` property is populated by the expected upstream step before `VerifySrc` is scheduled.
+
+---
+
+## # 12 Sources Used
+
+| # | Source Type | Query Window | Evidence | Relevance |
+|---|---|---|---|---|
+| 1 | **Splunk** `index=ecommander` | `2026-07-06T11:02:43Z` → `2026-07-06T11:08:23Z` | Job metadata, step state machine transitions, `BuildInfoJson` (`failedReason=Compile`), `NoSuchProperty` error, abort chain, agent resource release events, Commander CPU/DB metrics | **PRIMARY** — All CloudBees job execution data |
+| 2 | **Splunk** `index=ecommander` (Job ID search) | `-7d` → `now` | Job identity, agent host (`crm-ubuntulv42`), Commander nodes, step names, timing, outcome | Job discovery and context |
+| 3 | **Splunk** `index=ecommander` (crm-ubuntulv42 resource events) | `2026-07-06T11:00:00Z` → `2026-07-06T11:10:00Z` | Other jobs on `crm-ubuntulv42` (`f179656b`, `f179622e`) — both successful, no overlap with failure window | Agent concurrency assessment |
+| 4 | **Splunk** `index=ecommander` (crm-ubuntu316 stepLimitReached) | `2026-07-06T11:09:48Z` → `2026-07-06T11:09:59Z` | `crm-ubuntu316` at 100% step capacity — **after job failure window, different resource** | OUT_OF_SCOPE — excluded |
+| 5 | **Datadog Host Inventory** | `2026-07-06T11:00:00Z` → `2026-07-06T11:15:00Z` | Zero results for `crm-ubuntulv42` and `crm-ubuntu316` | No telemetry coverage for agent host |
+| 6 | **Datadog Metrics** (`system.cpu.user`, `system.mem.used`) | `2026-07-06T11:00:00Z` → `2026-07-06T11:15:00Z` | No data returned for `crm-ubuntulv42` | No agent host metric coverage |
+| 7 | **SCOM** (active alerts) | Current | No active alerts for `crm-ubuntulv42` | No infrastructure alerts on agent host |
+
+---
+
+> **Note:** The definitive compiler error details (specific error message, failing file, exit code) are contained in the CloudBees step log file `Make.f1792a36-765d-f11f-9ffe-1ea035bf3243.log` on agent `crm-ubuntulv42`. This file must be examined directly to complete the full RCA at the code level.

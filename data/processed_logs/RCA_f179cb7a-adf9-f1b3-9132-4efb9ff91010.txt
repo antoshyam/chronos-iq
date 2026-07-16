@@ -1,0 +1,178 @@
+I now have a complete, precise picture. The IO wait spike to **35.7ms** and IO utilization to **26%** aligns exactly with the VerifySrc step start at 06:19:31Z, followed by a massive network burst (257MB received, 144MB sent) and then an abrupt drop — all consistent with an **abort signal during a large source fetch**. Let me now compile the full RCA. ---
+🔍 Root Cause Analysis Report
+Job ID: f179cb7a-adf9-f1b3-9132-4efb9ff91010  |  Build: WLAN.TFH.3.7.1-01029-QCATFSWPZ-2  |  Outcome: ERROR / ABORTED
+
+---
+1. Executive Summary
+CloudBees job f179cb7a-adf9-f1b3-9132-4efb9ff91010 failed during the "VerifySrc" step with exit code 2 on agent host san-w175-ja4-6-06. The CloudBees execution context classifies the failure reason as "Aborted" — meaning the step was externally terminated, not a natural compile or code failure.
+
+Unlike the previous two jobs, this agent host IS registered in Datadog (Agent 7.64.1, GNU/Linux) and has full metric telemetry available. The metrics reveal a clear and precise infrastructure event during the VerifySrc step:
+
+IO Wait spike to 35.7ms and IO utilization to 26% — occurring at approximately 06:19:30–06:19:54Z, coinciding exactly with the VerifySrc step start (06:19:31Z)
+Massive network burst — 257MB received and 144MB sent in a ~28-second window (~06:19:16–06:19:44Z), consistent with a large source package fetch from a remote repository
+System load rose to 2.04 during the step, then dropped sharply after abort
+CPU dropped abruptly from ~2.7% to ~0.1% — consistent with a process being externally terminated (SIGTERM/SIGKILL or CloudBees abort signal)
+CPU stolen = 0 throughout — no hypervisor-level resource contention
+Memory: 95.8% usable, Disk: 53.7% used — both healthy, not contributing factors
+Probable Root Cause: The VerifySrc step initiated a large source fetch (~257MB inbound) that triggered significant IO wait on the agent's storage subsystem. The IO contention (35.7ms await, 26% utilization) caused the fetch operation to stall or exceed a timeout threshold, triggering an abort signal. Exit code 2 from VerifySrc is consistent with a script-level abort (e.g., exit 2 on timeout detection or a wget/curl/rsync interrupted transfer). The CloudBees "Aborted" classification confirms the step was terminated before natural completion.
+
+⚠️ No application-level logs are forwarded from san-w175-ja4-6-06 to Datadog. The Datadog Agent is installed and reporting metrics, but no log pipeline is configured for this host. Step-level stdout/stderr must be retrieved directly from CloudBees to confirm the exact abort trigger.
+
+---
+2. Job Context
+Job ID: f179cb7a-adf9-f1b3-9132-4efb9ff91010
+Job Name: WLAN.TFH.3.7.1-01029-QCATFSWPZ-2_20260706_231651_231706
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Outcome: completed_error / error
+Failed Step: VerifySrc (Step ID: f179cb7a-b96b-f157-a05c-2686f9881e6f)
+Exit Code: 2 — script-level abort / misuse of shell built-in or explicit exit 2 on error condition
+Agent Host: san-w175-ja4-6-06 (GNU/Linux, Datadog Agent 7.64.1 ✅)
+Build Name: WLAN.TFH.3.7.1-01029-QCATFSWPZ-2
+Declared Failure Reason: Aborted
+Build Type: WLAN TFH (Thin Firmware Host) — QCATFSWPZ variant
+---
+3. Build Timeline
+Time (UTC)	Event	Detail
+2026-07-07 06:17:06	Job Started	CRMBuilds / Build.Rel.602829 initiated on san-w175-ja4-6-06
+~2026-07-07 06:19:16	Large Network Burst Begins	Network inbound spikes to 131MB → 257MB → 279MB in rapid succession — large source fetch initiated
+2026-07-07 06:19:31	VerifySrc Step Started	Step begins — Correlation Window Opens
+~2026-07-07 06:19:36–06:19:54	⚡ IO Wait Spike	IO await peaks at 35.7ms, IO utilization reaches 26%, CPU iowait rises to 0.93% — storage subsystem under heavy load from concurrent network write
+~2026-07-07 06:19:54	IO Wait Subsides	IO await drops to 0.23ms — storage pressure relieved, but network burst continues (outbound spikes to 83–144MB)
+~2026-07-07 06:20:10–06:20:36	CPU Drops Abruptly	CPU user falls from ~2.7% to ~0.1% — process terminated. System load begins declining from peak of 2.04
+2026-07-07 06:20:36	VerifySrc Step ABORTED	Exit Code 2 — step terminated — Correlation Window Closes (duration: ~1m 5s)
+2026-07-07 06:24:37	Job Ended	Job terminates with outcome: error
+---
+4. Execution Path Inventory
+Failed Step: "VerifySrc" — source verification step performing large source package fetch (~257MB inbound) and write to local storage
+Agent Host: san-w175-ja4-6-06 (GNU/Linux, Datadog Agent 7.64.1 — metrics available, no log pipeline)
+Commander Host: Not identified — no evidence of Commander contribution to failure
+Invoked Services: Remote source repository (Artifactory or SCM — specific endpoint not available from metadata); local storage subsystem on san-w175-ja4-6-06
+---
+5. Detected Error Codes & Signals
+Code / Signal	Source	Meaning	Evidence
+Exit Code 2	CloudBees Step Metadata	Shell script abort — typically exit 2 on detected error condition, or return code from a failed utility (e.g., rsync protocol error, wget server error, curl partial file). Distinct from exit 1 (general error) and exit 0 (success).	failedStep.exitCode = "2"
+Aborted	CloudBees executionContext	CloudBees classified the failure as "Aborted" — step was terminated before natural completion, either by a timeout, external signal, or explicit abort in the script	executionContext.failedReason = "Aborted"
+IO Await 35.7ms	Datadog Metrics — san-w175-ja4-6-06	Storage device average wait time spiked to 35.7ms — significantly elevated (normal <5ms). Indicates storage subsystem saturation during the source fetch write operation.	system.io.await peak at ~06:19:42Z (point 9–10 in 6s interval series starting 06:17:04Z)
+IO Utilization 26%	Datadog Metrics — san-w175-ja4-6-06	Storage device utilization reached 26% — elevated but not fully saturated. Combined with 35.7ms await, suggests a slow storage device (spinning disk or congested NFS mount) rather than SSD.	system.io.util peak at ~06:19:42Z
+Network Burst 257MB rcvd	Datadog Metrics — san-w175-ja4-6-06	257MB received in a single 14-second interval — large source package download. Immediately followed by IO wait spike as data was written to local storage.	system.net.bytes_rcvd peak at point 7 (~06:19:30Z)
+CPU Abrupt Drop	Datadog Metrics — san-w175-ja4-6-06	CPU user dropped from ~2.7% to ~0.1% — consistent with process termination (abort signal received or script exited)	system.cpu.user sharp decline toward end of step window
+CPU Stolen = 0	Datadog Metrics — san-w175-ja4-6-06	No hypervisor CPU theft — VM-level resource contention is NOT a contributing factor	system.cpu.stolen = 0 throughout entire window
+---
+6. Correlated Observations
+CloudBees
+Step "VerifySrc" failed with exit code 2 and failure reason "Aborted" — the step was terminated before natural completion
+Step duration: ~1m 5s — shorter than the previous job's VerifySrc (~1m 51s), consistent with an early abort triggered by IO/timeout detection
+Build type WLAN.TFH.3.7.1 (Thin Firmware Host) — WLAN firmware builds typically involve large source trees requiring significant download and storage I/O
+Confidence: HIGH — directly from job payload
+Agent Host (san-w175-ja4-6-06) — KEY FINDINGS
+✅ Datadog Agent 7.64.1 installed — full metric telemetry available
+
+IO Subsystem:
+
+IO await peaked at 35.7ms at ~06:19:42Z — 11 seconds after VerifySrc started. Normal baseline was <1ms before the step.
+IO utilization reached 26% simultaneously — storage device under significant load
+CPU iowait peaked at 0.93% — processes were blocked waiting for IO
+IO metrics returned to near-zero within ~30 seconds, suggesting the IO burst was caused by the source fetch write, not a persistent storage failure
+The combination of 35.7ms await + 26% utilization at only 26% utilization suggests a slow storage device (spinning HDD or congested NFS mount) rather than a fast SSD — a 35ms await on a 26%-utilized device is abnormally high
+Network:
+
+257MB received in a single ~14-second interval (~06:19:16–06:19:30Z) — large source package download
+144MB sent in a later interval (~06:20:24–06:20:38Z) — possibly upload of verification results or artifact metadata
+Network activity pattern is consistent with a source fetch (large inbound) followed by a verification report upload (outbound)
+The IO wait spike follows the network burst by ~12 seconds — consistent with buffered writes being flushed to disk after the download completed
+CPU & Memory:
+
+CPU user: 2.69–2.71% — low, not a bottleneck
+CPU system: spiked to 2.58% mid-window — kernel-level activity (IO scheduling, network buffer management)
+Memory: 95.8% usable — no memory pressure
+Disk: 53.7% used — no disk exhaustion
+CPU stolen: 0% — no hypervisor contention
+System load: rose to 2.04 (elevated but not critical for a multi-core system)
+Other Jobs on Same Agent:
+
+System load of 2.04 during the step suggests at least one other concurrent process was running on san-w175-ja4-6-06 alongside the VerifySrc step. The load value of 2.04 with only ~2.7% CPU user is consistent with IO-blocked processes (processes in D-state waiting for IO), which would inflate load average without consuming CPU cycles.
+No direct evidence of other CloudBees jobs on this agent — step logs required to confirm concurrent job count
+Commander Host
+No Commander host identified in job metadata
+No Commander-related errors found in logs during the correlation window
+OUT_OF_SCOPE
+Datadog — Logs
+Zero log entries from san-w175-ja4-6-06 — Datadog Agent is installed but no log pipeline is configured for this host
+Zero Artifactory LDAP errors during this job's window (unlike the previous CRMBuilds job) — LDAP is NOT a contributing factor for this job
+Zero active incidents during the job execution window
+No monitors configured for san-w175-ja4-6-06
+Datadog — Incidents & Monitors
+Zero active incidents during the job execution window
+No monitors configured for san-w175-ja4-6-06
+External Dependencies — SCOPE VALIDATION
+Artifactory LDAP failures — Zero occurrences during this job's window. LDAP is NOT a factor for this job. OUT_OF_SCOPE
+NFS/storage logs — No NFS error logs found in Datadog. Cannot confirm or exclude NFS mount issues without host-level syslog access.
+---
+7. Probable Root Cause
+Primary: Storage IO Contention During Large Source Fetch → Timeout/Abort
+
+The VerifySrc step initiated a large source package download (~257MB) from a remote repository. As the downloaded data was written to the agent's local storage, the storage subsystem experienced significant IO contention — IO await spiked to 35.7ms (7× normal) and IO utilization reached 26%. The abnormally high await time at only 26% utilization indicates a slow or congested storage device (spinning HDD or NFS mount). The IO stall caused the source fetch or verification operation to exceed a timeout threshold, triggering an abort signal. The VerifySrc script detected the timeout/failure condition and exited with code 2. CloudBees classified this as "Aborted."
+
+Causal Chain:
+
+VerifySrc step starts at 06:19:31Z on san-w175-ja4-6-06
+Step initiates large source package download — 257MB received in ~14 seconds
+Downloaded data is written to local storage — IO await spikes to 35.7ms, IO util to 26%
+Storage IO contention causes write operations to stall — processes enter D-state (IO wait), system load rises to 2.04
+Source fetch or verification operation exceeds timeout threshold OR IO error is detected
+VerifySrc script detects failure condition → exits with code 2
+CloudBees marks step as failed with reason "Aborted"
+Supporting Evidence:
+
+IO await 35.7ms at ~06:19:42Z — 11 seconds after step start (Datadog system.io.await)
+IO utilization 26% simultaneously (Datadog system.io.util)
+CPU iowait 0.93% — processes blocked on IO (Datadog system.cpu.iowait)
+257MB network inbound burst immediately preceding IO spike (Datadog system.net.bytes_rcvd)
+CPU abrupt drop to 0.1% — process terminated (Datadog system.cpu.user)
+Exit code 2 — script-level abort, not a process crash (CloudBees metadata)
+failedReason = "Aborted" — CloudBees confirms external termination (CloudBees executionContext)
+Step duration ~1m 5s — shorter than expected for a successful source verification, consistent with early abort
+---
+8. Confidence Level
+✅ MEDIUM-HIGH
+
+HIGH confidence that IO contention occurred on san-w175-ja4-6-06 during the VerifySrc step — direct metric evidence with precise timestamps
+HIGH confidence that the step was aborted (not a natural failure) — exit code 2 + failedReason "Aborted" + abrupt CPU drop
+HIGH confidence that the IO spike was caused by the large source fetch write — network burst immediately precedes IO spike by ~12 seconds (buffer flush delay)
+MEDIUM confidence on the specific abort trigger (timeout vs. IO error vs. explicit abort) — step logs on san-w175-ja4-6-06 are not available in Datadog (no log pipeline configured)
+Cannot achieve HIGH without direct VerifySrc step log output confirming the exact error message (timeout, IO error, or abort signal)
+---
+9. Infrastructure vs Code Assessment
+Assessment	Verdict	Reason
+Infrastructure Issue	YES — CONFIRMED	Direct metric evidence of storage IO contention on the agent host during the step execution window. IO await 35.7ms at 26% utilization indicates a slow/congested storage device. This is an infrastructure-layer failure on the agent host.
+Code Issue	NO — UNLIKELY	No compiler errors, no syntax errors, no missing symbols. The "Aborted" classification and exit code 2 indicate external termination, not a code-level failure. The WLAN source tree itself is not implicated.
+Mixed	POSSIBLE	Cannot fully exclude a concurrent job on the same agent contributing to IO contention. System load of 2.04 suggests possible concurrent workload.
+---
+10. Recommended Remediation
+Retrieve VerifySrc step logs from CloudBees: Access the CloudBees Commander UI for job f179cb7a-adf9-f1b3-9132-4efb9ff91010 → Step "VerifySrc" → View Log. Confirm whether the output contains IO error messages, timeout messages, or explicit abort signals (e.g., rsync error: partial transfer, wget: write error, Timeout exceeded).
+Investigate storage device on san-w175-ja4-6-06: Check whether the build workspace is on a local spinning disk, SSD, or NFS mount. A 35.7ms IO await at only 26% utilization strongly suggests a slow device. Run iostat -x 1 or check /proc/diskstats to identify the device type and current health.
+Check for NFS mount issues: If the build workspace is on an NFS mount, check NFS server health and mount options (especially rsize/wsize and async vs sync settings). NFS mounts can exhibit high await times under load.
+Check concurrent job count on san-w175-ja4-6-06: Review CloudBees agent configuration to determine how many concurrent jobs are allowed on this agent. System load of 2.04 during a low-CPU step suggests concurrent IO-intensive workloads. Reduce concurrent job slots if IO contention is confirmed.
+Re-run the build: If the storage issue is transient (e.g., temporary NFS congestion), re-trigger the build. Monitor IO metrics during the re-run to confirm resolution.
+---
+11. Preventive Actions
+Configure Datadog Log Pipeline on san-w175-ja4-6-06: The Datadog Agent is installed but no logs are being forwarded. Configure log collection for CloudBees agent logs, syslog, and kernel messages to enable full RCA without direct host access.
+Add IO Wait Monitor: Create a Datadog monitor on system.io.await for all san-w175 build agents. Alert when IO await exceeds 20ms — this would have detected the storage contention before it caused a build abort.
+Storage Upgrade Assessment: Evaluate whether san-w175-ja4-6-06's build workspace storage should be upgraded to SSD or a higher-performance NFS tier. WLAN firmware builds involve large source trees (257MB+ downloads) that are IO-intensive.
+Concurrent Job Throttling: Implement IO-aware job scheduling on CloudBees agents. Limit concurrent IO-intensive steps (VerifySrc, Make) on agents with spinning disk storage to prevent IO contention between simultaneous builds.
+Pre-Step IO Health Check: Add a pre-step to the CloudBees procedure that validates storage IO performance (e.g., a quick dd write test) before initiating large source fetches. Abort early with a clear error message if IO performance is degraded.
+Increase VerifySrc Timeout: If the abort is triggered by a timeout threshold, consider increasing the timeout for large WLAN source trees — or implement retry logic with exponential backoff for transient IO stalls.
+Standardize Agent Monitoring: Audit all san-w175 build agents for Datadog log pipeline configuration. 20 san-w175 hosts are registered in Datadog but none appear to have log forwarding configured.
+---
+12. Sources Used
+Source Type	Query Window	Evidence	Relevance
+CloudBees Job Payload	N/A (provided)	Job ID, step "VerifySrc", exit code 2, agent host san-w175-ja4-6-06, failedReason "Aborted"	HIGH — Primary evidence source
+Datadog Host Inventory	Current	san-w175-ja4-6-06 confirmed with Agent 7.64.1, GNU/Linux. 20 other san-w175 hosts also registered.	HIGH — Confirms telemetry availability
+Datadog Metrics — system.io.await	06:17:00–06:22:00 UTC	Peak 35.7ms at ~06:19:42Z; baseline <1ms before/after step	HIGH — Direct evidence of storage IO contention during step
+Datadog Metrics — system.io.util	06:17:00–06:22:00 UTC	Peak 26% at ~06:19:42Z	HIGH — Corroborates IO contention finding
+Datadog Metrics — system.net.bytes_rcvd	06:17:00–06:22:00 UTC	257MB received in single 14s interval at ~06:19:16–06:19:30Z	HIGH — Identifies large source fetch as IO trigger
+Datadog Metrics — system.cpu.user/iowait/stolen	06:17:00–06:22:00 UTC	CPU user drop to 0.1% (abort); iowait 0.93% (IO blocking); stolen 0% (no VM contention)	HIGH — Confirms abort pattern and excludes VM contention
+Datadog Logs (Flex)	06:17:00–06:25:00 UTC	Zero log entries for host, job ID, build name, or procedure — no log pipeline on san-w175-ja4-6-06	Confirms log coverage gap
+Datadog Logs — Artifactory (Flex)	06:17:00–06:25:00 UTC	Zero LDAP sync failures during this job's window — LDAP not a factor	Excludes LDAP as contributing factor
+Datadog Incidents	06:17:00–06:25:00 UTC	Zero active incidents	No relevant findings

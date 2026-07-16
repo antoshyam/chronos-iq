@@ -1,0 +1,110 @@
+Build ID: f179d502-bece-f173-9751-1ea035bf3243
+1. Executive Summary
+The CloudBees build job Kaanapali.LA.1.2-00029-PERF.INT-1_20260707_002513_002520 failed on 2026-07-07 with outcome completed_error / ABORT. The primary failure was a compilation failure in the Make step, explicitly recorded as Compile in the BuildInfoJson. This triggered an abort cascade that caused the downstream VerifySrc and SaveBuild steps to also fail. The agent host san-w170-s5-4-05 (resource alias: crm-ubuntu322) was healthy during the failure window — CPU was low-to-moderate (avg ~2.2%), memory was stable (~519–533 GB), and disk utilization showed only a minor transient bump. The Commander nodes (las-colo12-j13-09/10/11) were fully operational. The root cause is a code/compile-level failure in the Kaanapali.LA.1.2 source tree at revision 00029, not an infrastructure issue.
+
+2. Job Context
+Build / Job ID	f179d502-bece-f173-9751-1ea035bf3243
+Job Name	Kaanapali.LA.1.2-00029-PERF.INT-1_20260707_002513_002520
+Project	CRMBuilds
+Procedure	Build.Rel.602829
+Launched By	tiberiumUserEC10_11
+Built By	dcheruku
+Client	PERF.INT
+Site	SanDiego
+Software Image	Kaanapali.LA.1.2
+Branch Point Revision	00029
+Eng Label	GLUE.KAANAPALI_LA.1.2-00006-NOOP_TEST_KAANAPALI-1
+Host OS	Ubuntu 22.04 (Linux 5.15.0-173-generic)
+Workflow	LEGACY
+Outcome	completed_error / ABORT
+Failure Reason (BuildInfoJson)	Compile
+Build Delete Date	2026-07-10T00:25:42Z
+3. Build Timeline
+Time (UTC)	Event	Status
+2026-07-07 07:25:20Z	Job started	🟢 Running
+2026-07-07 07:25:13Z	Make step begins on crm-ubuntu322 (san-w170-s5-4-05)	🟡 In Progress
+~07:25:13Z – 07:27:27Z	CPU on agent elevated (2.2–4.7%) — active compilation	🟡 Active
+~07:27:27Z	Make step FAILS — compilation error; CPU drops sharply to ~0.6–0.8%	🔴 FAILED
+~07:27:27Z	Job abort cascade triggered (JobCompletedAction on las-colo12-j13-11)	🔴 ABORT
+~07:27:27Z	VerifySrc step fails due to abort cascade	🔴 FAILED
+~07:27:27Z	SaveBuild step fails due to abort cascade	🔴 FAILED
+2026-07-07 07:29:32Z	Job ends — total duration ~252 seconds	🔴 completed_error
+4. Execution Path Inventory
+Failed Step: Make (primary), VerifySrc & SaveBuild (cascade)
+Agent Host: san-w170-s5-4-05 (resource alias: crm-ubuntu322)
+Agent ID: f0ec3f85-4546-f1e5-bdf6-2686f9881e6f
+Agent Version: 2024.12.0.177508 | Protocol 6 | State: alive
+Resource Pool: CRMBuildsLinux-Ubuntu22-04 (25 resources)
+Commander Nodes: las-colo12-j13-09, las-colo12-j13-10, las-colo12-j13-11
+Commander Public Endpoint: qso-bicmdr.qualcomm.com
+Workspace (NFS): \\snowcone\builds709\PROD (snowcone filer)
+Build Location: /local/mnt/workspace/CRMBuilds/Kaanapali.LA.1.2-00029-PERF.INT-1_20260707_002513/
+5. Detected Error Codes / Indicators
+Indicator	Value	Source
+Job Outcome	completed_error	CloudBees / Splunk ecommander
+Job Status	ABORT	CloudBees / Splunk ecommander
+Failure Reason	Compile (BuildInfoJson)	CloudBees / Splunk ecommander
+Abort Trigger	JobCompletedAction on las-colo12-j13-11	CloudBees / Splunk ecommander
+CPU Drop Signal	CPU fell from ~2.3% → ~0.6% at ~07:27:27Z (Make step end)	Datadog Metrics
+6. Correlated Observations
+☁️ CloudBees
+Job f179d502-bece-f173-9751-1ea035bf3243 ran from 07:25:20Z to 07:29:32Z (~252 seconds).
+Three steps failed: Make (primary), VerifySrc, SaveBuild (cascade).
+BuildInfoJson explicitly records failure reason as "Compile".
+Abort was triggered via JobCompletedAction on Commander node las-colo12-j13-11.
+🖥️ Agent Host (san-w170-s5-4-05 / crm-ubuntu322)
+CPU: Ranged 0.5%–4.7% (avg ~2.2%). Elevated during Make step (07:25–07:27), then dropped sharply at ~07:27:27Z — consistent with process termination due to compile failure.
+Memory: Stable at ~519–533 GB. No memory pressure or OOM indicators.
+Disk: Minor transient bump from ~41.3% → ~46.1% at ~07:25:13Z (workspace creation), then normalized. No disk full condition.
+Network: Active throughput (1.2 MB/s – 135 MB/s) — normal build I/O patterns. No drops or anomalies.
+Agent State: alive throughout. No agent crash or disconnect.
+🏗️ Commander Nodes (las-colo12-j13-09/10/11)
+All three Commander nodes were fully operational. Steps were dispatched and responses received normally (status=0, no errorMessage).
+Concurrent jobs on the same agent (crm-ubuntu322) were also running successfully during this window — confirming the agent itself was healthy.
+📊 Datadog
+No Datadog logs found for this build ID or agent host in the failure window.
+Datadog metrics for san-w170-s5-4-05 confirm no infrastructure anomaly (CPU, memory, disk, network all within normal bounds).
+📋 Splunk (ecommander)
+Build metadata confirmed: job name, project, procedure, agent, Commander nodes, workspace path, and failure reason all retrieved.
+Other concurrent jobs on crm-ubuntu322 (e.g., MPSS.KI.1.0-02759, QXA.QA.6.5.r1-16002) completed successfully — confirming no shared resource contention caused the failure.
+No Commander-level errors or agent communication failures found in logs.
+🔗 External Dependencies
+NFS Workspace (snowcone/builds709): Workspace was mounted and accessible (steps invoked successfully). No storage failure evidence.
+AWS S3: Referenced in concurrent jobs (DownloadBuildFromS3, Execute_S3_Dirlist_Uploader) — those completed successfully. No S3 failure for this build.
+Commander Server: qso-bicmdr.qualcomm.com — operational.
+7. Probable Root Cause
+Primary Root Cause: Compilation Failure in the Make Step
+
+The Make step for build Kaanapali.LA.1.2 at revision 00029 failed with a compile error. This is explicitly confirmed by the BuildInfoJson failure reason field set to "Compile". The CPU profile on the agent shows active processing during the Make step followed by an abrupt drop at ~07:27:27Z, consistent with a compiler process exiting with a non-zero exit code. The agent, Commander, NFS storage, and network were all healthy. No infrastructure component contributed to the failure.
+
+The specific compiler error (missing symbol, syntax error, header issue, etc.) is contained in the Make step execution log at:
+/local/mnt/workspace/CRMBuilds/Kaanapali.LA.1.2-00029-PERF.INT-1_20260707_002513/
+
+8. Confidence Level
+🟢 MEDIUM–HIGH
+Reason: The failure reason "Compile" is directly recorded in CloudBees BuildInfoJson metadata (HIGH confidence). The CPU telemetry pattern on the agent corroborates a process termination at the expected time (MEDIUM confidence). The specific compiler error message is not available in Splunk/Datadog — it resides in the step execution log file on the agent/filer. Infrastructure is ruled out with HIGH confidence based on agent metrics and Commander log analysis.
+
+9. Infrastructure vs. Code Assessment
+Infrastructure Issue	NO
+Code Issue	YES
+Mixed	NO
+Reason: Agent host metrics (CPU, memory, disk, network) show no anomalies. Commander nodes were healthy. Concurrent jobs on the same agent completed successfully. The failure is isolated to the Make/compile step of this specific build, with the failure reason explicitly tagged as "Compile" in build metadata.
+
+10. Recommended Remediation
+Examine the Make step log directly on the build filer at:
+/local/mnt/workspace/CRMBuilds/Kaanapali.LA.1.2-00029-PERF.INT-1_20260707_002513/
+Look for compiler errors (error:, undefined reference, fatal error, etc.).
+Review recent code changes in the Kaanapali.LA.1.2 branch at revision 00029 submitted by dcheruku — identify any syntax errors, missing headers, or API changes.
+Check the Eng Label GLUE.KAANAPALI_LA.1.2-00006-NOOP_TEST_KAANAPALI-1 for any known issues or incompatible changes introduced.
+Re-trigger the build after fixing the identified compile error to confirm resolution.
+If the compile error is intermittent, check for toolchain version mismatches on crm-ubuntu322.
+11. Preventive Actions
+Enable pre-submit compile checks (incremental build validation) before full integration builds to catch compile errors earlier.
+Configure CloudBees step log forwarding to Splunk/Datadog for Make/compile steps to enable faster RCA without manual log retrieval.
+Add build failure alerting with failure reason tagging (Compile/Link/Test) to PagerDuty or Slack for faster triage.
+Implement build history trending for Kaanapali.LA.1.2 to detect recurring compile failures at specific revisions.
+12. Sources Used
+Source	Query Window	Evidence	Relevance
+Splunk (index=ecommander)	2026-07-07 07:25–07:30Z	Job metadata, step names, agent identity, failure reason, Commander logs	PRIMARY — direct job execution evidence
+Datadog Metrics (system.*)	2026-07-07 07:20–07:35Z	CPU, memory, disk, network for san-w170-s5-4-05	Infrastructure health validation
+Datadog Logs	2026-07-07 07:25–07:30Z	No results found	No relevant findings

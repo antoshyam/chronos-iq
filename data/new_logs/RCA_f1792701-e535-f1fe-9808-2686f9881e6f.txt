@@ -1,0 +1,292 @@
+---
+job_id: f1792701-e535-f1fe-9808-2686f9881e6f
+chat_id: FKTT9C6FA6VTPACTG30P
+generated_at: 2026-07-07T16:15:42.951096
+source: NOVA
+partial_response: False
+---
+
+I now have all the critical data needed. The `SourceViolationRequired` property was not found in the `SourceViolationRequired` search (no results), but it was captured earlier. The Make step exit code for **this specific job** (`f1792701-e535-f1fe-9808-2686f9881e6f`) is confirmed from the `CommitCommandResults` transition from `success→error` at `10:42:59.876Z`. The Make step ran for only **~12 seconds** (`10:42:47Z` to `10:42:59Z`), which is abnormally short for a compile step. I have all the evidence needed to compile the full RCA report.
+
+---
+
+# CloudBees CD/RO Root Cause Analysis Report
+
+---
+
+## # 1 Summary
+
+CloudBees job **`f1792701-e535-f1fe-9808-2686f9881e6f`** — build `Divar.LA.3.0.3-00005-GKI.W3K.INT-1` — failed on **2026-07-06** at **10:42:59 UTC** with a **Compile Failure** classification. The primary trigger was the **Make** step, which completed with `outcome=error` after only **~12 seconds** of execution — abnormally short for a compile step — and propagated an `abortJob` cascade that terminated the entire job. The `BuildInfoJson.failedReason=Compile` field explicitly classifies the failure as a compile-level error.
+
+A secondary anomaly was detected: a `NoSuchProperty` error on Commander node `las-colo12-j13-10` at `10:42:52Z` for property `/myJob/SourceViolationRequired`, which indicates a missing job property that the **VerifySrc** step attempted to read. This is a secondary cascade effect, not the root cause.
+
+Agent host `crm-ubuntu221` showed **no resource exhaustion** (CPU peak 14%, memory stable, disk at 9%). Commander infrastructure was healthy. No SCOM alerts were active. The actual compile error content resides in the step log file `Make.f1792701-ef20-f1ae-b001-4efb9ff91010.log` on `crm-ubuntu221`, which is not accessible via Splunk or Datadog and must be examined directly to determine the specific compiler error.
+
+---
+
+## # 2 Job Context
+
+| Field | Value |
+|---|---|
+| **Job ID** | `f1792701-e535-f1fe-9808-2686f9881e6f` |
+| **Job Name** | `Divar.LA.3.0.3-00005-GKI.W3K.INT-1_20260706_033942_033946` |
+| **Build Name** | `Divar.LA.3.0.3-00005-GKI.W3K.INT-1` |
+| **Project** | `CRMBuilds` |
+| **Procedure** | `Build.Rel.602829` |
+| **Launched By** | `tiberiumUserEC10_11` |
+| **Run As** | `aswbldsv` |
+| **Built By** | `vraparth` |
+| **Execution Node (Agent)** | `crm-ubuntu221` |
+| **Agent ID** | `f0ec3f79-076e-f126-a229-2686f9881e6f` |
+| **Agent OS** | Ubuntu 18.04, Linux kernel 4.15.0-226-generic, x86_64 |
+| **Agent Version** | CloudBees 2024.12.0.177508 |
+| **Resource Pool** | `CRMBuildsLinux-Ubuntu18-04` |
+| **Workspace** | `crm_ws_sd` |
+| **Build Drive** | `G:` |
+| **Build Location** | `\\snowcone\builds727\PROD\Divar.LA.3.0.3-00005-GKI.W3K.INT-1` |
+| **Linux Build Path** | `/prj/qct/asw/crmbuilds/snowcone/builds727/PROD/Divar.LA.3.0.3-00005-GKI.W3K.INT-1` |
+| **Software Image** | `Divar.LA.3.0.3` |
+| **Eng Label** | `GLUE.DIVAR_LA.3.0.2-00014-NOOP_TEST-1` |
+| **Site** | SanDiego |
+| **Workflow Type** | LEGACY |
+| **Commander Nodes** | `las-colo12-j13-10` (10.81.104.242), `las-colo12-j13-11` (10.81.104.243) |
+| **Commander Public Endpoint** | `qso-bicmdr.qualcomm.com` |
+| **Start** | `2026-07-06T10:39:46.753Z` |
+| **Finish** | `2026-07-06T10:46:16.769Z` |
+| **Elapsed** | ~383,704 ms (~6 min 24 sec) |
+| **Final Status** | `completed_error` |
+| **Outcome** | `error` |
+| **AbortStatus** | `ABORT` |
+| **failedReason** | `Compile` |
+
+---
+
+## # 3 Build Timeline
+
+| Time (UTC) | Event |
+|---|---|
+| `10:39:46.753Z` | Job created and started |
+| `10:39:47.503Z` | **Setup** step begins on `crm-ubuntu221` |
+| `10:40:05.562Z` | **Setup** step completes — `outcome=success`, exit code 0 (18s) |
+| `10:40:05Z` | **ReserveHost** step begins |
+| `10:40:08Z` | Job properties set: `GenerateProvenanceServer=crm-ubuntu221`, `JOBNAME=Divar.LA.3.0.3-00005-GKI.W3K.INT-1_20260706_033942`, `CurrentEnvironment=Prod` |
+| `10:40:12Z` | Concurrent job `f17924a7-35f2-f191-bed1-2686f9881e6f` steps (Notify codesign, Cleanup) complete on `crm-ubuntu221` — `outcome=success` |
+| `~10:40:05Z–10:42:47Z` | **Init → SyncSetup → BBS_PreSync → Sync → Strip → BBS_PostSync → ConcurrentCopy** steps execute (all inferred success based on no abort prior to Make) |
+| `10:42:06Z` | Concurrent job `f1792754-8fc6-f1c9-9c13-2686f9881e6f` step Init released on `crm-ubuntu221` — `outcome=success` |
+| `10:42:47.578Z` | **Make** step transitions to `runnable` on Commander `las-colo12-j13-10` |
+| `10:42:47.649Z` | **Make** step scheduled on `las-colo12-j13-10` |
+| `10:42:47.873Z` | **Make** step transitions to `running` on `las-colo12-j13-11` |
+| `10:42:47.597Z` | Agent `crm-ubuntu221` last run time recorded (stepCount=2, stepLimit=9) |
+| `10:42:52.189Z` | ⚠️ `NoSuchProperty` error on `las-colo12-j13-10`: property `/myJob/SourceViolationRequired` does not exist |
+| `10:42:59.876Z` | **Make** step `CommitCommandResults` transitions `success → error` |
+| `10:42:59.893Z` | Make step `readyToComplete=true` |
+| `10:42:59.894Z` | Make step `stepCompleted` |
+| `10:42:59.906Z` | Resource `crm-ubuntu221` released from Make step |
+| `10:42:59.982Z` | `AbortStepOperation` fires — `abortJob` error handling triggers job abort cascade |
+| `10:43:00Z` | **VerifySrc** step abort request submitted |
+| `10:43:03.519Z` | Resource `crm-ubuntu221` released from VerifySrc step |
+| `10:43:03.536Z` | **VerifySrc** step `stepCompleted` — `outcome=error`, `code=ABORTED` |
+| `10:44:07.805Z` | **SaveBuild** step (alwaysRun) `stepCompleted` — `outcome=error` |
+| `10:46:16.769Z` | Job finalized — `completed_error`, `abortStatus=ABORT` |
+
+**Make step duration: ~12 seconds** (`10:42:47Z` → `10:42:59Z`) — abnormally short for a compile step.
+
+---
+
+## # 4 Execution Path Inventory
+
+| Component | Role | Status |
+|---|---|---|
+| **Step: Make** (ID: `f1792701-ef20-f1ae-b001-4efb9ff91010`) | Primary compile step — **FAILED** | `outcome=error`, exit code not captured in Commander logs |
+| **Step: VerifySrc** (ID: `f1792701-ef20-f1ac-b001-4efb9ff91010`) | Source verification — **ABORTED** | `code=ABORTED`, cascade from Make failure |
+| **Step: SaveBuild** (ID: `f1792701-ef47-f1c2-b001-4efb9ff91010`) | Build save (alwaysRun) — **FAILED** | `outcome=error`, cascade |
+| **Agent Host: crm-ubuntu221** | Execution agent for all steps | Alive throughout; no resource exhaustion |
+| **Commander: las-colo12-j13-10** (10.81.104.242) | Scheduling, API handler | Healthy; `NoSuchProperty` error logged |
+| **Commander: las-colo12-j13-11** (10.81.104.243) | StateMachine, step transitions | Healthy |
+| **Build Storage: snowcone** | NFS mount `\\snowcone\builds727\PROD` | No evidence of failure (not directly testable via available tools) |
+| **DB: oil.qualcomm.com** (`aswproductiondatabase`) | CRM database | No evidence of failure |
+| **Service: verifysrc.qualcomm.com** | VerifySrc web service | Not reached (step aborted before execution) |
+| **Service: csds.qualcomm.com** | Software Revision Service | No evidence of failure |
+
+---
+
+## # 5 Detected Error Codes
+
+| Error Code / Signal | Step | Evidence | Significance |
+|---|---|---|---|
+| `outcome=error` | Make | `CommitCommandResults` transition `success→error` at `10:42:59.876Z` (Splunk `index=ecommander`) | **Primary failure signal** |
+| `failedReason=Compile` | Job-level | `BuildInfoJson.failedReason=Compile` (Splunk `index=ecommander`) | Explicit compile failure classification |
+| `abortJob` cascade | Make → VerifySrc → SaveBuild | `AbortStepOperation` fired at `10:42:59.982Z`; three steps failed with `errorHandling=abortJob` | Cascade from Make failure |
+| `code=ABORTED` | VerifySrc | `abortStatus=ABORT` at `10:43:03Z` | Secondary — caused by Make abort |
+| `NoSuchProperty: /myJob/SourceViolationRequired` | VerifySrc (pre-execution) | Commander `las-colo12-j13-10` at `10:42:52.189Z` | Missing job property; secondary anomaly |
+| Make step duration ~12 seconds | Make | Step `runnable=10:42:47Z`, `stepCompleted=10:42:59Z` | Abnormally short — indicates early compile failure |
+
+> **Note:** The specific compiler exit code (e.g., exit 1, exit 2) and the actual compiler error message are **not present in Commander logs or Splunk**. They reside exclusively in the step log file: `Make.f1792701-ef20-f1ae-b001-4efb9ff91010.log` on agent `crm-ubuntu221`.
+
+---
+
+## # 6 Correlated Observations
+
+### CloudBees
+
+- **Job metadata confirmed:** Project `CRMBuilds`, Procedure `Build.Rel.602829`, agent `crm-ubuntu221`, build `Divar.LA.3.0.3-00005-GKI.W3K.INT-1`.
+- **Make step failed** after only ~12 seconds of execution — consistent with an early compile error (e.g., missing header, missing symbol, syntax error, or failed pre-compile check).
+- **`BuildInfoJson.failedReason=Compile`** is the system-level classification, set by the build framework itself.
+- **`NoSuchProperty: /myJob/SourceViolationRequired`** at `10:42:52Z` on `las-colo12-j13-10` — this property was expected by the VerifySrc step but was never set, likely because the Make step failed before the property-setting logic could execute. This is a **secondary symptom**, not a root cause.
+- **39 total steps** in the job; the abort cascade prevented all downstream steps from executing.
+- **Concurrent jobs on crm-ubuntu221:**
+  - `f17924a7-35f2-f191-bed1-2686f9881e6f` — steps completed successfully at `10:40:12Z` (before Make ran)
+  - `f1792754-8fc6-f1c9-9c13-2686f9881e6f` — Init step completed at `10:42:06Z` (before Make ran)
+  - Agent `stepCount=2`, `stepLimit=9` at time of Make assignment — **no resource contention**
+
+### Agent Host (`crm-ubuntu221`)
+
+- **CPU:** Peak 14.11% at job start, rapidly declined to <1%. No sustained CPU pressure. ✅
+- **Memory:** Stable 191–201 GB range throughout window. No exhaustion. ✅
+- **Disk:** Stable ~9% utilization. No disk pressure. ✅
+- **SCOM Alerts:** None active. ✅
+- **Datadog Logs:** No logs indexed for `host:crm-ubuntu221` in the failure window. ⚠️ (Telemetry gap — see Data Gap note below)
+- **Agent state:** `alive` throughout the job execution per Commander logs.
+
+> **Data Gap Note:** Datadog returned 0 log results for `host:crm-ubuntu221` during the failure window. Agent host `crm-ubuntu221` has **no Datadog log coverage** for this time window. The step execution log (`Make.f1792701-ef20-f1ae-b001-4efb9ff91010.log`) on `crm-ubuntu221` must be examined directly to determine the specific compile error.
+
+### Commander Host
+
+- **las-colo12-j13-10** and **las-colo12-j13-11**: Both nodes processed job transitions normally. Hibernate queries at 0ms. HTTP 200 returned on job details page. No Commander-level errors.
+- **`NoSuchProperty` error** on `las-colo12-j13-10` at `10:42:52Z` for `/myJob/SourceViolationRequired` — this is a secondary effect of the Make failure, not a Commander infrastructure issue.
+- **StateMachine-037** thread processed job completion normally.
+- **Post-job LDAP lookup** for `aswbldsv` against `QCOM-QED-LDAP` — normal ACL/notification behavior.
+
+### Datadog
+
+- **Metrics (crm-ubuntu221):** CPU, memory, and disk metrics all within normal ranges. No resource exhaustion detected during the failure window (`10:39:00Z–10:47:00Z`).
+- **Logs:** No Datadog log entries for `host:crm-ubuntu221` in the failure window. **No relevant findings.**
+- **SCOM Alerts:** No active alerts for `crm-ubuntu221`. **No relevant findings.**
+
+### Splunk
+
+- **Source:** `index=ecommander`, `sourcetype=ec_debug`
+- **Query Window:** `2026-07-06T10:39:00Z` to `2026-07-06T10:47:00Z`
+- **Findings:** Full job lifecycle confirmed. Make step failure at `10:42:59Z`. `failedReason=Compile`. `NoSuchProperty` error. Abort cascade confirmed. Commander nodes healthy.
+- **Limitation:** Step-level execution logs (compiler output) are not indexed in Splunk.
+
+### External Dependency
+
+- **snowcone NFS mount** (`\\snowcone\builds727\PROD`): No evidence of mount failure or I/O errors in available telemetry. Cannot be confirmed or excluded without agent-side log review. **OUT_OF_SCOPE** unless step log reveals NFS-related errors.
+- **oil.qualcomm.com** (CRM DB): No evidence of connectivity failure. **No relevant findings.**
+- **verifysrc.qualcomm.com**: Not reached — VerifySrc step was aborted before execution. **OUT_OF_SCOPE.**
+- **csds.qualcomm.com**: No evidence of failure. **No relevant findings.**
+
+---
+
+## # 7 Probable Root Cause
+
+**Primary Root Cause: Compile Failure in the Make Step**
+
+The CloudBees job failed because the **Make step** (`f1792701-ef20-f1ae-b001-4efb9ff91010`) returned an error outcome after only **~12 seconds** of execution on agent `crm-ubuntu221`. The build framework explicitly classified this as `failedReason=Compile` in `BuildInfoJson`.
+
+**Supporting Evidence:**
+1. `CommitCommandResults` transitioned Make step from `success → error` at `10:42:59.876Z` — direct Commander log evidence (Splunk `index=ecommander`)
+2. `BuildInfoJson.failedReason=Compile` — explicit system-level classification (Splunk `index=ecommander`)
+3. Make step duration of **~12 seconds** is abnormally short for a compile step, indicating an early-stage compile failure (e.g., missing source file, missing header, preprocessor error, or failed pre-compile validation)
+4. `errorHandling=abortJob` on the Make step triggered the full job abort cascade
+5. Agent host resource metrics (CPU, memory, disk) show **no infrastructure pressure** that could have caused the failure
+6. Commander nodes were healthy with no errors
+7. No SCOM alerts on `crm-ubuntu221`
+
+**Secondary Anomaly (Not Root Cause):**
+- `NoSuchProperty: /myJob/SourceViolationRequired` at `10:42:52Z` — this property was expected by the VerifySrc step. Its absence is a **consequence** of the Make step failing before the property-setting logic executed, not a contributing cause.
+
+**Evidence Gap:**
+The specific compiler error message, failing source file, and exact exit code are contained in `Make.f1792701-ef20-f1ae-b001-4efb9ff91010.log` on `crm-ubuntu221`. This log is not accessible via Splunk or Datadog and must be retrieved directly from the agent.
+
+---
+
+## # 8 Confidence Level
+
+### **MEDIUM**
+
+**Reason:**
+- **HIGH confidence** that the Make step failed and caused the job abort — direct Commander log evidence from Splunk (`CommitCommandResults success→error`, `failedReason=Compile`, abort cascade)
+- **HIGH confidence** that infrastructure (CPU, memory, disk, Commander) was NOT the cause — Datadog metrics and SCOM confirm healthy agent resources
+- **MEDIUM overall** because the specific compiler error (the actual root cause within the compile step) is not available in Splunk or Datadog — it requires direct examination of the step log file on `crm-ubuntu221`
+- Confidence cannot be elevated to HIGH without the step log content
+
+---
+
+## # 9 Infrastructure vs Code Assessment
+
+| Assessment | Result |
+|---|---|
+| **Infrastructure Issue** | **NO** |
+| **Code Issue** | **YES** (probable) |
+| **Mixed** | **NO** |
+
+**Reason:**
+- Agent host `crm-ubuntu221` showed no CPU, memory, or disk exhaustion during the failure window (Datadog metrics)
+- No SCOM alerts on the agent host
+- Commander nodes were healthy
+- `BuildInfoJson.failedReason=Compile` explicitly classifies this as a code/compile-level failure
+- The ~12-second Make step duration is consistent with a compile error (source code issue, missing dependency, or build configuration problem) rather than an infrastructure timeout or resource failure
+- The specific compile error content is in the step log and must be reviewed to confirm whether it is a source code defect, missing dependency, or build environment configuration issue
+
+---
+
+## # 10 Recommended Remediation
+
+1. **Retrieve and examine the Make step log immediately:**
+   - File: `Make.f1792701-ef20-f1ae-b001-4efb9ff91010.log`
+   - Location: Agent `crm-ubuntu221`, workspace `crm_ws_sd`
+   - This log contains the actual compiler error, failing file, and exit code
+
+2. **Identify the specific compile error:**
+   - Look for: missing headers, undefined symbols, syntax errors, missing source files, failed pre-compile checks, or dependency resolution failures
+   - The ~12-second duration suggests an early-stage failure (pre-compilation check, missing file, or immediate compiler error)
+
+3. **Review the `SourceViolationRequired` property:**
+   - Determine which step is responsible for setting `/myJob/SourceViolationRequired`
+   - Confirm whether this property should have been set before the Make step ran, or whether its absence is expected when Make fails early
+   - If it should be set earlier in the pipeline, investigate why it was missing
+
+4. **Review the source label `GLUE.DIVAR_LA.3.0.2-00014-NOOP_TEST-1`:**
+   - Verify that all required source components for `Divar.LA.3.0.3-00005-GKI.W3K.INT-1` were correctly synced before the Make step
+   - Check the Sync and ConcurrentCopy step logs for any warnings
+
+5. **Check the build environment configuration:**
+   - Verify that the `G:` drive (mapped to `\\snowcone\builds727\PROD`) was accessible and had sufficient space
+   - Confirm that all required build tools and libraries were present on `crm-ubuntu221`
+
+6. **Notify the build owner (`vraparth`):**
+   - Share the step log findings and the specific compile error for code-level remediation
+
+---
+
+## # 11 Preventive Actions
+
+1. **Implement step log forwarding to Splunk:** The Make step log is the most critical artifact for compile failure RCA. Forwarding step logs (or at minimum error-level output) to Splunk would eliminate the current evidence gap and enable faster root cause identification.
+
+2. **Add pre-compile validation step:** Insert a lightweight pre-compile check step before Make that validates: source sync completeness, required file presence, build tool availability, and NFS mount health. This would catch configuration issues before the compile step runs.
+
+3. **Set `SourceViolationRequired` property earlier in the pipeline:** If this property is required by VerifySrc, ensure it is set during the Setup or Init step rather than depending on Make to set it. This prevents the `NoSuchProperty` cascade error.
+
+4. **Add Datadog agent log collection for `crm-ubuntu221`:** The absence of Datadog log coverage for this host created a telemetry gap. Ensure the Datadog agent is configured to collect CloudBees step logs or system logs from all build agents.
+
+5. **Monitor Make step duration:** Implement a CloudBees monitor or Datadog metric alert for Make step durations below a threshold (e.g., < 60 seconds) to detect abnormally short compile steps that indicate early failures.
+
+6. **Implement build retry logic:** For transient compile failures (e.g., NFS hiccups, temporary tool unavailability), configure the Make step with a retry count of 1–2 to reduce false-positive failures.
+
+---
+
+## # 12 Sources Used
+
+| # | Source Type | Query Window | Evidence | Relevance |
+|---|---|---|---|---|
+| 1 | **Splunk** (`index=ecommander`) | `2026-07-06T10:39:00Z – 10:47:00Z` | Job ID, job name, project, procedure, agent, step outcomes, Make failure at `10:42:59Z`, `failedReason=Compile`, abort cascade, `NoSuchProperty` error, Commander node activity, concurrent jobs on `crm-ubuntu221` | **Primary** — all CloudBees job metadata and failure evidence |
+| 2 | **Datadog Metrics** (`system.cpu.user`, `system.mem.used`, `system.disk.in_use`) | `2026-07-06T10:39:00Z – 10:47:00Z` | CPU peak 14.11%, memory 191–201 GB stable, disk 9% stable — no resource exhaustion | Agent host health assessment |
+| 3 | **Datadog Logs** (`host:crm-ubuntu221`) | `2026-07-06T10:39:00Z – 10:47:00Z` | **0 results** — no log coverage for this host in this window | Telemetry gap confirmed |
+| 4 | **SCOM** (`crm-ubuntu221`) | Current | **0 active alerts** | Agent host alert status — no infrastructure alerts |
+| 5 | **Step Log** (`Make.f1792701-ef20-f1ae-b001-4efb9ff91010.log`) | N/A — not accessible | **Not retrieved** — resides on `crm-ubuntu221` | **Required** for specific compile error identification |
+
+---
+
+> **⚠️ Critical Action Required:** The step log file `Make.f1792701-ef20-f1ae-b001-4efb9ff91010.log` on agent `crm-ubuntu221` (workspace `crm_ws_sd`) must be examined directly to identify the specific compiler error, failing source file, and exact exit code. Without this log, the root cause is classified as **Compile Failure — specific error unknown**.

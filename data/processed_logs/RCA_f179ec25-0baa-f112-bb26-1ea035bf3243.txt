@@ -1,0 +1,142 @@
+Build ID: f179ec25-0baa-f112-bb26-1ea035bf3243
+---
+1. Executive Summary
+The CloudBees build Kaanapali.LA.1.0.r1-00985.01-PERF.INT-4 failed on 2026-07-07 due to a compile failure in the Make step, which exited with exit code 4 — a standard GNU Make non-zero exit indicating one or more compilation targets failed. The Make step's errorHandling=abortJob policy triggered an abort cascade, causing VerifySrc and SaveBuild to also fail, and all downstream steps to be canceled. No infrastructure issues were detected on the agent host or Commander nodes. The root cause is a code/compile failure.
+
+---
+2. Job Context
+Build ID: f179ec25-0baa-f112-bb26-1ea035bf3243
+Job Name: Kaanapali.LA.1.0.r1-00985.01-PERF.INT-4_20260707_031047_031056
+Build Name: Kaanapali.LA.1.0.r1-00985.01-PERF.INT-4
+Project: CRMBuilds
+Procedure: Build.Rel.602829
+Launched By: tiberiumUserEC10_11
+Built By: slashkar
+Outcome: error / Failed
+Failed Reason (BuildInfoJson): Compile
+Primary Failed Step: Make
+Software Image: Kaanapali.LA.1.0.r1
+Client: PERF.INT
+Engineering Label: GLUE.KAANAPALI_LA.1.0-00416-NOOP_TEST_KAANAPALI-1
+Branch Point Revision: 00985.01 | Spin: 4
+Site: SanDiego | Host OS: Ubuntu 22.04 | Workflow: LEGACY
+Filer Path: \\snowcone\builds905\PROD\Kaanapali.LA.1.0.r1-00985.01-PERF.INT-4
+Build Delete Date: 2026-07-10T03:11:22Z
+---
+3. Build Timeline
+Time (PDT)	Event	Status
+03:10:56	Job created / started	✅ Running
+03:11:14	Setup step completed	✅ Success (exit 0, 18s)
+03:11:22	ReserveHost, Init, SyncSetup, BBS_PreSync, Sync, Strip, BBS_PostSync, ConcurrentCopy steps executed	✅ Success
+03:13:34	Make step scheduled on agent san-w175-ma3-2-05	⏳ Scheduled
+03:13:35	Make step started running (workspace: /local/mnt/workspace/CRMBuilds/...)	⏳ Running
+03:14:15	Make step FAILED — FinishCommandOperation reported exit code 4	❌ FAILED (exit 4)
+03:14:15	CommitCommandResultsOperation: outcome updated success → error; abortJob triggered	❌ Abort Triggered
+03:14:19	VerifySrc step aborted (command exited abnormally)	❌ ABORTED
+03:14:42	SaveBuild step completed with outcome=error (abortJob)	❌ ABORTED
+03:14:43	Job abort cascade complete; all downstream steps canceled	❌ Canceled
+03:16:49	BuildInfoJson written (status=Failed, failedReason=Compile)	❌ Failed
+03:17:00	Job finalized — CleanUp and AddManifest ran (alwaysRun, errorHandling=ignore)	✅ Cleanup OK
+Total Elapsed Time: ~363,913 ms (~6 minutes 4 seconds)
+
+---
+4. Execution Path Inventory
+Primary Failed Step: Make (Step ID: f179ec25-16f3-f1ef-baaa-2686f9881e6f)
+Agent Host: san-w175-ma3-2-05 (Agent ID: f0ec3fee-317a-f1af-8a2d-2686f9881e6f, Ubuntu 22.04, Agent v2024.12.0.177508, Zone: default/PROXY)
+Build Drive: G: (Linux path: /local/mnt/workspace/CRMBuilds/...)
+Run As User: aswbldsv
+Shell: bash
+Commander Nodes: las-colo12-j13-09, las-colo12-j13-10, las-colo12-j13-11
+Resource Pool: CRMBuildsLinux-Ubuntu22-04
+Filer Storage: \\snowcone\builds905\PROD
+---
+5. Detected Error Codes
+Step	Exit Code	Meaning	Evidence
+Make	4	GNU Make non-zero exit — one or more build targets failed to compile	FinishCommandOperation on las-colo12-j13-11 at 03:14:15.420 — "status OK but exit code 4"
+VerifySrc	ABORTED	Step aborted due to Make failure cascade	Resource released at 03:14:19; outcome=error/ABORTED
+SaveBuild	ABORTED	Step aborted due to Make failure cascade	CommitCommandResultsOperation at 03:14:42.926 — outcome updated success → error
+Job-Level Error Message:
+
+Job error [Aborted]: step 'Make' failed and its error handling aborted the job.
+Job error [Aborted]: step 'VerifySrc' failed and its error handling aborted the job.
+Job error [Aborted]: step 'SaveBuild' failed and its error handling aborted the job.
+---
+6. Correlated Observations
+☁️ CloudBees
+Make step ran for only ~40 seconds (03:13:35 → 03:14:15) before failing with exit code 4 — indicating a fast compile failure, not a timeout.
+errorHandling=abortJob was set on Make, VerifySrc, and SaveBuild — all three triggered the abort cascade.
+All pre-Make steps (Setup, ReserveHost, Init, SyncSetup, BBS_PreSync, Sync, Strip, BBS_PostSync, ConcurrentCopy) completed successfully — source sync was clean.
+Post-failure steps CleanUp and AddManifest ran successfully (alwaysRun, errorHandling=ignore).
+No resource wait time, no license wait time, no workspace wait time — no queuing or resource contention.
+Resource pool CRMBuildsLinux-Ubuntu22-04 had stepCount 2–4 vs stepLimit 6 — no resource exhaustion.
+🖥️ Agent Host (san-w175-ma3-2-05)
+Datadog Logs: No logs found for this host in the failure window. Agent host has no Datadog telemetry coverage for this time window.
+SCOM Alerts: No active SCOM alerts found for san-w175-ma3-2-05.
+OS/System Logs (Splunk os/osetx): No results returned — no OS-level errors (OOM, disk full, CPU spike) detected.
+Other Jobs on Same Agent: Other jobs were observed on san-w175-ma3-2-05 during the window, all with outcome=success. No resource contention was detected (stepCount within stepLimit).
+Assessment: No infrastructure-level evidence of failure on the agent host.
+🏛️ Commander Nodes (las-colo12-j13-09/10/11)
+All three Commander nodes processed job events normally.
+State machine transitions (StepCompletionPrecondition, StepCompletedAction, CommitCommandResultsOperation) executed correctly and as expected.
+No Commander-level errors detected.
+📊 Datadog
+No Datadog logs or metrics found for san-w175-ma3-2-05 during the failure window.
+No Datadog alerts correlated to this job ID, build name, or agent host.
+🔎 Splunk
+ecommander index confirmed all job metadata, step execution sequence, exit codes, and abort cascade.
+OS/osetx indexes returned no results for the agent host — no system-level anomalies logged.
+🔗 External Dependencies
+Source sync (Sync step) completed successfully — SCM/BBS was not a contributing factor.
+Filer storage (\\snowcone\builds905\PROD) was accessible — no storage failure detected.
+Associated image builds (WLAN, BTFW, TZ, BOOT, etc.) were referenced but are downstream artifacts — not a cause of the Make failure.
+---
+7. Probable Root Cause
+Root Cause: Compile Failure in the Make Step (Exit Code 4)
+
+The Make step executed on agent san-w175-ma3-2-05 for the build Kaanapali.LA.1.0.r1-00985.01-PERF.INT-4 (branch point revision 00985.01, engineering label GLUE.KAANAPALI_LA.1.0-00416-NOOP_TEST_KAANAPALI-1) exited with exit code 4 at 03:14:15 PDT. GNU Make exit code 4 indicates that one or more build targets failed during compilation. The BuildInfoJson explicitly records failedReason: "Compile". All pre-Make steps succeeded, confirming the source code was synced correctly. The failure is isolated to the compilation phase and is most likely caused by a source code error, missing symbol, incompatible dependency, or build script issue introduced in revision 00985.01 or the engineering label GLUE.KAANAPALI_LA.1.0-00416-NOOP_TEST_KAANAPALI-1.
+
+Supporting Evidence:
+
+FinishCommandOperation at 03:14:15.420 on las-colo12-j13-11: "status OK but exit code 4"
+CommitCommandResultsOperation at 03:14:15.440: outcome updated from success → error
+BuildInfoJson: failedReason: "Compile", status: "Failed"
+Make step duration: ~40 seconds — fast failure, not a timeout
+All pre-Make steps succeeded — source sync was clean
+No infrastructure anomalies on agent host or Commander nodes
+---
+8. Confidence Level
+🟡 MEDIUM
+
+The classification as a compile failure is confirmed by CloudBees metadata (failedReason=Compile), exit code 4, and the absence of any infrastructure anomalies. However, the specific compile error message (e.g., which file, which symbol, which error) is not available in Splunk — it resides in the Make step log file (Make.f179ec25-16f3-f1ef-baaa-2686f9881e6f.log) on the agent. Without the step log content, the exact compile error cannot be confirmed, preventing a HIGH confidence rating.
+
+---
+9. Infrastructure vs Code Assessment
+Infrastructure Issue	NO
+Code / Compile Issue	YES
+Mixed Issue	NO
+Reason: No infrastructure anomalies were detected on the agent host (san-w175-ma3-2-05), Commander nodes, or any directly invoked service. The failure is entirely attributable to the Make compilation step returning exit code 4, with BuildInfoJson explicitly recording failedReason=Compile. All infrastructure components functioned normally.
+
+---
+10. Recommended Remediation
+Retrieve the Make step log from agent san-w175-ma3-2-05:
+/local/mnt/workspace/CRMBuilds/Kaanapali.LA.1.0.r1-00985.01-PERF.INT-4_20260707_031047/Make.f179ec25-16f3-f1ef-baaa-2686f9881e6f.log
+This will reveal the exact compiler error, file, and line number.
+Review the code changes in branch point revision 00985.01 and engineering label GLUE.KAANAPALI_LA.1.0-00416-NOOP_TEST_KAANAPALI-1 submitted by slashkar for compilation errors.
+Check for dependency issues — verify all associated image builds (WLAN, BTFW, TZ, BOOT, etc.) referenced in BuildInfoJson are available and compatible.
+Re-run the build after fixing the identified compile error.
+If the build log is no longer accessible (delete date: 2026-07-10), contact the build owner slashkar to reproduce the failure locally.
+---
+11. Preventive Actions
+Enforce pre-submit compile checks (incremental build validation) before merging to the Kaanapali.LA.1.0 branch.
+Enable compile error notifications to the submitting engineer (slashkar) immediately upon Make step failure.
+Consider adding a pre-Make syntax/lint check step to catch obvious errors before full compilation.
+Retain Make step logs for longer than 3 days (current delete date is 3 days post-build) to allow adequate RCA time.
+Integrate Datadog agent monitoring on build servers to capture CPU/memory/disk telemetry during build execution.
+---
+12. Sources Used
+Source	Query Window	Evidence	Relevance
+Splunk (index=ecommander)	2026-07-07 03:10–03:20 PDT	Job metadata, step execution, exit code 4, abort cascade, BuildInfoJson, agent details	PRIMARY — full job execution record
+Datadog Logs (flex tier)	2026-07-07 03:10–03:20 UTC	No logs found for host san-w175-ma3-2-05	No telemetry coverage for agent host
+SCOM Alerts	Current active alerts	No active alerts for san-w175-ma3-2-05	No infrastructure alerts on agent
+Splunk (index=os, osetx)	2026-07-07 03:10–03:20 PDT	No results — no OS-level errors	No system-level anomalies on agent
+---
